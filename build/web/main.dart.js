@@ -40293,7 +40293,7 @@ A.ajn.prototype={
 $0(){return this.a.x=!1},
 $S:0}
 A.ajr.prototype={
-$2(a,b){var s=this,r=null,q=t.D,p=A.c([B.hT,A.eP(r,r,B.u,r,r,new A.cx(B.CG,r,r,A.dy(2),r,r,B.a9),r,4,r,r,r,r,36),B.l5,new A.d2(B.DR,A.hz(A.c([A.avM("assets/images/logo.png",B.iD,36,r)],q),B.a6,B.aA,B.Z),r)],q),o=s.a,n=s.d
+$2(a,b){var s=this,r=null,q=t.D,p=A.c([B.hT,A.eP(r,r,B.u,r,r,new A.cx(B.CG,r,r,A.dy(2),r,r,B.a9),r,4,r,r,r,r,36),B.l5,new A.d2(B.DR,A.hz(A.c([A.avM("assets/images/logo.png",B.iD,56,r)],q),B.a6,B.aA,B.Z),r)],q),o=s.a,n=s.d
 if(s.c)B.b.U(p,A.c([A.hz(A.c([A.ib(o.Kx(n),5),B.l4,A.ib(A.eN(A.c([o.DK(B.nw,"Speed",B.c.a0(n.d,0)+" km/h"),B.yK,o.DK(B.ny,"Waiting",B.c.a0(n.c,1)+" min"),B.yK,o.DK(B.nx,"Distance",B.c.a0(n.b,2)+" km")],q),B.a6,B.cd),4)],q),B.aQ,B.aA,B.Z),B.hT,A.hz(A.c([A.ib(o.Kz(n),1),B.l4,A.hD(o.KA(n),r,150)],q),B.a6,B.aA,B.Z)],q))
 else B.b.U(p,A.c([o.Kx(n),B.yJ,A.hz(A.c([o.DJ(B.nw,"km/h",B.c.a0(n.d,0)),B.hR,o.DJ(B.ny,"min wait",B.c.a0(n.c,1)),B.hR,o.DJ(B.nx,"km",B.c.a0(n.b,2))],q),B.a6,B.aA,B.Z),B.yJ,o.Kz(n),B.l5,o.KA(n)],q))
 return A.eP(r,A.axv(A.eN(p,B.a6,B.cd),b,new A.aX(16,0,16,12+s.b)),B.u,r,r,B.Ag,r,r,r,r,r,r,r)},
