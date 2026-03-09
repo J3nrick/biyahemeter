@@ -82,9 +82,9 @@ class _HomeScreenState extends State<HomeScreen> {
     final isLandscape = mq.orientation == Orientation.landscape;
     final bottomPad = mq.padding.bottom;
 
-    final double sheetMin = isLandscape ? 0.28 : 0.22;
-    final double sheetInitial = isLandscape ? 0.62 : 0.52;
-    final double sheetMax = isLandscape ? 0.96 : 0.92;
+    const double sheetMin = 0.22;
+    const double sheetInitial = 0.52;
+    const double sheetMax = 0.92;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -97,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // ── Draggable bottom sheet ──
           DraggableScrollableSheet(
-            key: ValueKey(isLandscape),
+            key: const ValueKey('sheet'),
             initialChildSize: sheetInitial,
             minChildSize: sheetMin,
             maxChildSize: sheetMax,
@@ -136,8 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      if (isLandscape) ..._buildLandscapeContent(meter)
-                      else ..._buildPortraitContent(meter),
+                      ..._buildContent(meter, isLandscape),
                     ],
                   ),
                 ),
@@ -150,19 +149,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ── Portrait layout ──
-  List<Widget> _buildPortraitContent(MeterProvider meter) => [
-        _buildFareRow(meter),
-        const SizedBox(height: 10),
-        _buildStatsRow(meter),
-        const SizedBox(height: 10),
-        _buildSettingsRow(meter),
-        const SizedBox(height: 12),
-        _buildStartButton(meter),
-      ];
-
-  // ── Landscape layout: fare + stats side-by-side, settings + button in a row ──
-  List<Widget> _buildLandscapeContent(MeterProvider meter) => [
+  // ── Unified adaptive content ──
+  List<Widget> _buildContent(MeterProvider meter, bool isLandscape) {
+    if (isLandscape) {
+      return [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -181,6 +171,17 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ];
+    }
+    return [
+      _buildFareRow(meter),
+      const SizedBox(height: 10),
+      _buildStatsRow(meter),
+      const SizedBox(height: 10),
+      _buildSettingsRow(meter),
+      const SizedBox(height: 12),
+      _buildStartButton(meter),
+    ];
+  }
 
   // ── Fare Row ──
   Widget _buildFareRow(MeterProvider meter) {
