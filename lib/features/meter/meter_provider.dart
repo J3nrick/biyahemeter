@@ -113,19 +113,33 @@ class MeterProvider extends ChangeNotifier {
   }
 
   void _onPositionUpdate(Position position) {
+    // Reject poor-accuracy fixes — GPS noise on a stationary device
+    // can easily be 15–50 m, which falsely accumulates as distance.
+    if (position.accuracy > 20.0) return;
+
     _currentPosition = LatLng(position.latitude, position.longitude);
-    _currentSpeed = (position.speed * 3.6).clamp(0, 300); // m/s → km/h
+    // Negative speed means the device couldn't measure it — treat as 0.
+    _currentSpeed = position.speed < 0
+        ? 0.0
+        : (position.speed * 3.6).clamp(0.0, 300.0); // m/s → km/h
     _lastUpdateTime = DateTime.now();
     _routePoints.add(_currentPosition!);
 
     if (_lastPosition != null) {
-      const distance = Distance();
-      final meters = distance.as(
-        LengthUnit.Meter,
-        _lastPosition!,
-        _currentPosition!,
-      );
-      _distanceKm += meters / 1000.0;
+      // Only count distance when actually moving (speed > 2 km/h).
+      // Below this threshold the reading is GPS jitter, not real motion.
+      if (_currentSpeed > 2.0) {
+        const distance = Distance();
+        final meters = distance.as(
+          LengthUnit.Meter,
+          _lastPosition!,
+          _currentPosition!,
+        );
+        // Ignore GPS teleportation glitches (> 150 m in one update).
+        if (meters < 150) {
+          _distanceKm += meters / 1000.0;
+        }
+      }
     }
     _lastPosition = _currentPosition;
 

@@ -159,16 +159,24 @@ class _HomeScreenState extends State<HomeScreen> {
             bottom: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-              child: Row(
-                children: [
-                  // App name logo
-                  Image.asset(
-                    'assets/images/logo.png',
-                    height: 120,
-                    fit: BoxFit.contain,
-                  ),
-
-                ],
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  boxShadow: const [
+                    BoxShadow(
+                      color: Color(0x33000000),
+                      blurRadius: 12,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  height: 38,
+                  fit: BoxFit.contain,
+                ),
               ),
             ),
           ),
