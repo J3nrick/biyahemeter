@@ -136,6 +136,20 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 12),
 
+                      // ── Logo header — always above fare card ──
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+                        child: Row(
+                          children: [
+                            Image.asset(
+                              'assets/images/logo.png',
+                              height: 36,
+                              fit: BoxFit.contain,
+                            ),
+                          ],
+                        ),
+                      ),
+
                       if (isLandscape) ..._buildLandscapeContent(meter)
                       else ..._buildPortraitContent(meter),
                     ],
@@ -145,38 +159,6 @@ class _HomeScreenState extends State<HomeScreen> {
             },
           ),
 
-          // ── Logo badge — permanently pinned top-left ──
-          SafeArea(
-            bottom: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(14),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x33000000),
-                          blurRadius: 12,
-                          offset: Offset(0, 2),
-                        ),
-                      ],
-                    ),
-                    child: Image.asset(
-                      'assets/images/logo.png',
-                      height: 36,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
         ],
       ),
     );
