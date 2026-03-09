@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
@@ -61,7 +62,16 @@ class _SplashGateState extends State<_SplashGate> {
     // Run while the native splash is still pinned — driver sees the GPS
     // permission dialog before the app UI appears (clean, professional UX).
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      await Permission.locationWhenInUse.request();
+      // permission_handler is not supported on web — skip it to prevent
+      // an UnimplementedError that would keep the splash pinned forever.
+      if (!kIsWeb) {
+        try {
+          await Permission.locationWhenInUse.request();
+        } catch (_) {
+          // Fail gracefully — the app still works; GPS permission can be
+          // requested later when the trip starts via geolocator.
+        }
+      }
       FlutterNativeSplash.remove();
     });
   }
