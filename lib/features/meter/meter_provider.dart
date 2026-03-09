@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:biyahe_meter/core/utils/trip_calculator.dart';
 
@@ -88,6 +89,7 @@ class MeterProvider extends ChangeNotifier {
     _totalFare = _baseFare;
     _routePoints.clear();
     _lastPosition = null;
+    WakelockPlus.enable();
     notifyListeners();
 
     // Start GPS tracking
@@ -147,6 +149,7 @@ class MeterProvider extends ChangeNotifier {
     _positionStream = null;
     _waitingTimer?.cancel();
     _waitingTimer = null;
+    WakelockPlus.disable();
     notifyListeners();
   }
 
@@ -167,6 +170,7 @@ class MeterProvider extends ChangeNotifier {
   void dispose() {
     _positionStream?.cancel();
     _waitingTimer?.cancel();
+    WakelockPlus.disable();
     super.dispose();
   }
 }

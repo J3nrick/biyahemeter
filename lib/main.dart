@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
@@ -7,7 +9,11 @@ import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_screen.dart';
 
 void main() {
-  WidgetsFlutterBinding.ensureInitialized();
+  // Preserve the splash screen until the first frame is rendered.
+  final WidgetsBinding widgetsBinding =
+      WidgetsFlutterBinding.ensureInitialized();
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -31,8 +37,35 @@ class BiyaheMeterApp extends StatelessWidget {
         title: 'BiyaheMeter PH',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
-        home: const AgreementsScreen(),
+        home: const _SplashGate(child: AgreementsScreen()),
       ),
     );
   }
+}
+
+/// Removes the native splash screen after the first frame is drawn,
+/// ensuring the [AgreementsScreen] is fully laid out before the
+/// splash disappears — no white flash.
+class _SplashGate extends StatefulWidget {
+  final Widget child;
+  const _SplashGate({required this.child});
+
+  @override
+  State<_SplashGate> createState() => _SplashGateState();
+}
+
+class _SplashGateState extends State<_SplashGate> {
+  @override
+  void initState() {
+    super.initState();
+    // Run while the native splash is still pinned — driver sees the GPS
+    // permission dialog before the app UI appears (clean, professional UX).
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Permission.locationWhenInUse.request();
+      FlutterNativeSplash.remove();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => widget.child;
 }

@@ -176,7 +176,7 @@ class _MapWidgetState extends State<MapWidget> {
                     alignment: Alignment.center, // anchor dot at its center
                     child: Container(
                       decoration: BoxDecoration(
-                        color: const Color(0xFFFFB800),
+                        color: const Color.fromARGB(255, 0, 85, 255),
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 3),
                         boxShadow: const [

@@ -9,7 +9,7 @@ import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 class AgreementsScreen extends StatelessWidget {
   const AgreementsScreen({super.key});
 
-  static const _green   = Color(0xFF2E7D32);
+  static const _blue   = Color(0xFF1A56DB);  // professional blue
   static const _label   = Color(0xFF1C1C1E);
   static const _sub     = Color(0xFF6B6B6B);
   static const _divClr  = Color(0xFFE8E8E8);
@@ -129,10 +129,10 @@ class AgreementsScreen extends StatelessWidget {
               height: 22,
               margin: const EdgeInsets.only(top: 1),
               decoration: BoxDecoration(
-                color: value ? _green : Colors.white,
+                color: value ? _blue : Colors.white,
                 borderRadius: BorderRadius.circular(6),
                 border: Border.all(
-                  color: value ? _green : const Color(0xFFBBBBBB),
+                  color: value ? _blue : const Color(0xFFBBBBBB),
                   width: 1.5,
                 ),
               ),
@@ -262,7 +262,7 @@ class AgreementsScreen extends StatelessWidget {
         duration: const Duration(milliseconds: 220),
         height: 50,
         decoration: BoxDecoration(
-          color: enabled ? _green : const Color(0xFFE0E0E0),
+          color: enabled ? _blue : const Color(0xFFE0E0E0),
           borderRadius: BorderRadius.circular(12),
         ),
         child: Center(
