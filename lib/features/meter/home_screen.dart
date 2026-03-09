@@ -82,9 +82,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final isLandscape = mq.orientation == Orientation.landscape;
     final bottomPad = mq.padding.bottom;
 
-    const double sheetMin = 0.22;
-    const double sheetInitial = 0.52;
-    const double sheetMax = 0.92;
+    final double sheetMin = isLandscape ? 0.35 : 0.22;
+    final double sheetInitial = isLandscape ? 0.65 : 0.52;
+    final double sheetMax = isLandscape ? 0.98 : 0.92;
+    final bool compact = isLandscape;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -97,12 +98,12 @@ class _HomeScreenState extends State<HomeScreen> {
 
           // ── Draggable bottom sheet ──
           DraggableScrollableSheet(
-            key: const ValueKey('sheet'),
+            key: ValueKey(isLandscape),
             initialChildSize: sheetInitial,
             minChildSize: sheetMin,
             maxChildSize: sheetMax,
             snap: true,
-            snapSizes: [sheetInitial],
+            snapSizes: [sheetMin, sheetInitial],
             builder: (context, scrollController) {
               return Container(
                 decoration: const BoxDecoration(
@@ -119,8 +120,9 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 child: SingleChildScrollView(
                   controller: scrollController,
-                  padding:
-                      EdgeInsets.fromLTRB(16, 0, 16, 12 + bottomPad),
+                  padding: EdgeInsets.fromLTRB(
+                        compact ? 12 : 16, 0,
+                        compact ? 12 : 16, 12 + bottomPad),
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
@@ -136,7 +138,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      ..._buildContent(meter, isLandscape),
+                      ..._buildContent(meter, compact),
                     ],
                   ),
                 ),
@@ -150,14 +152,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── Unified adaptive content ──
-  List<Widget> _buildContent(MeterProvider meter, bool isLandscape) {
-    if (isLandscape) {
+  List<Widget> _buildContent(MeterProvider meter, bool compact) {
+    if (compact) {
       return [
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Expanded(flex: 5, child: _buildFareRow(meter)),
-            const SizedBox(width: 10),
+            Expanded(flex: 5, child: _buildFareRow(meter, compact: compact)),
+            const SizedBox(width: 8),
             Expanded(flex: 4, child: _buildStatsColumn(meter)),
           ],
         ),
@@ -165,9 +167,9 @@ class _HomeScreenState extends State<HomeScreen> {
         Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Expanded(child: _buildSettingsRow(meter)),
-            const SizedBox(width: 10),
-            SizedBox(width: 150, child: _buildStartButton(meter)),
+            Expanded(child: _buildSettingsRow(meter, compact: compact)),
+            const SizedBox(width: 8),
+            SizedBox(width: 140, child: _buildStartButton(meter, compact: compact)),
           ],
         ),
       ];
@@ -184,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── Fare Row ──
-  Widget _buildFareRow(MeterProvider meter) {
+  Widget _buildFareRow(MeterProvider meter, {bool compact = false}) {
     String updateText;
     final lastUpdate = meter.lastUpdateTime;
     if (lastUpdate == null) {
@@ -197,7 +199,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: EdgeInsets.symmetric(horizontal: 16, vertical: compact ? 10 : 14),
       decoration: BoxDecoration(
         color: _navy,
         borderRadius: BorderRadius.circular(16),
@@ -398,7 +400,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── Inline Settings Row ──
-  Widget _buildSettingsRow(MeterProvider meter) {
+  Widget _buildSettingsRow(MeterProvider meter, {bool compact = false}) {
     return Container(
       decoration: BoxDecoration(
         color: _surface,
@@ -418,6 +420,7 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: _kmController,
               focusNode: _kmFocus,
               isEditing: _editingKm,
+              compact: compact,
               onTapEdit: () {
                 if (_editingGas) _saveGas(meter);
                 if (_editingBase) _saveBase(meter);
@@ -438,6 +441,7 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: _gasController,
               focusNode: _gasFocus,
               isEditing: _editingGas,
+              compact: compact,
               onTapEdit: () {
                 if (_editingKm) _saveKm(meter);
                 if (_editingBase) _saveBase(meter);
@@ -457,6 +461,7 @@ class _HomeScreenState extends State<HomeScreen> {
               controller: _baseFareController,
               focusNode: _baseFareFocus,
               isEditing: _editingBase,
+              compact: compact,
               onTapEdit: () {
                 if (_editingKm) _saveKm(meter);
                 if (_editingGas) _saveGas(meter);
@@ -478,13 +483,15 @@ class _HomeScreenState extends State<HomeScreen> {
     required TextEditingController controller,
     required FocusNode focusNode,
     required bool isEditing,
+    bool compact = false,
     required VoidCallback onTapEdit,
     required VoidCallback onSave,
   }) {
     return GestureDetector(
       onTap: isEditing ? null : onTapEdit,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        padding: EdgeInsets.symmetric(
+              horizontal: compact ? 10 : 14, vertical: compact ? 8 : 10),
         child: Row(
           children: [
             FaIcon(icon, size: 12, color: _accent),
@@ -545,14 +552,14 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   // ── Start / Stop pill button ──
-  Widget _buildStartButton(MeterProvider meter) {
+  Widget _buildStartButton(MeterProvider meter, {bool compact = false}) {
     final isRunning = meter.isRunning;
     return GestureDetector(
       onTap: () => isRunning ? meter.stopTrip() : meter.startTrip(),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
-        height: 52,
+        height: compact ? 44 : 52,
         decoration: BoxDecoration(
           color: Colors.black,
           borderRadius: BorderRadius.circular(14),
