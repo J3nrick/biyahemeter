@@ -79,104 +79,101 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final meter = context.watch<MeterProvider>();
     final mq = MediaQuery.of(context);
+    final isLandscape = mq.orientation == Orientation.landscape;
     final bottomPad = mq.padding.bottom;
+
+    final double sheetMin = isLandscape ? 0.28 : 0.22;
+    final double sheetInitial = isLandscape ? 0.62 : 0.52;
+    final double sheetMax = isLandscape ? 0.96 : 0.92;
 
     return Scaffold(
       backgroundColor: Colors.black,
+      resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [
           // ── Full-screen map ──
           const MapWidget(),
 
-          // ── Bottom panel ──
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: Container(
-              decoration: const BoxDecoration(
-                color: _bg,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
-                boxShadow: [
-                  BoxShadow(
+          // ── Draggable bottom sheet ──
+          DraggableScrollableSheet(
+            key: ValueKey(isLandscape),
+            initialChildSize: sheetInitial,
+            minChildSize: sheetMin,
+            maxChildSize: sheetMax,
+            snap: true,
+            snapSizes: [sheetInitial],
+            builder: (context, scrollController) {
+              return Container(
+                decoration: const BoxDecoration(
+                  color: _bg,
+                  borderRadius:
+                      BorderRadius.vertical(top: Radius.circular(22)),
+                  boxShadow: [
+                    BoxShadow(
                       color: Color(0x22000000),
                       blurRadius: 20,
-                      offset: Offset(0, -4)),
-                ],
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Drag handle
-                  const SizedBox(height: 8),
-                  Container(
-                    width: 36,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFD1D1D6),
-                      borderRadius: BorderRadius.circular(2),
+                      offset: Offset(0, -4),
                     ),
+                  ],
+                ),
+                child: SingleChildScrollView(
+                  controller: scrollController,
+                  padding:
+                      EdgeInsets.fromLTRB(16, 0, 16, 12 + bottomPad),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // ── Drag handle ──
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 36,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFD1D1D6),
+                          borderRadius: BorderRadius.circular(2),
+                        ),
+                      ),
+                      const SizedBox(height: 12),
+
+                      if (isLandscape) ..._buildLandscapeContent(meter)
+                      else ..._buildPortraitContent(meter),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-
-                  // ── Fare row ──
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _buildFareRow(meter),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  // ── Stats chips ──
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _buildStatsRow(meter),
-                  ),
-
-                  const SizedBox(height: 10),
-
-                  // ── Editable settings row ──
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: _buildSettingsRow(meter),
-                  ),
-
-                  const SizedBox(height: 12),
-
-                  // ── Start / Stop pill button ──
-                  Padding(
-                    padding: EdgeInsets.fromLTRB(16, 0, 16, 12 + bottomPad),
-                    child: _buildStartButton(meter),
-                  ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
 
-          // ── Floating top bar (last = always on top of panel) ──
+          // ── Logo badge — permanently pinned top-left ──
           SafeArea(
             bottom: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(14, 10, 14, 0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  boxShadow: const [
-                    BoxShadow(
-                      color: Color(0x33000000),
-                      blurRadius: 12,
-                      offset: Offset(0, 2),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x33000000),
+                          blurRadius: 12,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: Image.asset(
-                  'assets/images/logo.png',
-                  height: 38,
-                  fit: BoxFit.contain,
-                ),
+                    child: Image.asset(
+                      'assets/images/logo.png',
+                      height: 36,
+                      fit: BoxFit.contain,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -184,6 +181,38 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
+
+  // ── Portrait layout ──
+  List<Widget> _buildPortraitContent(MeterProvider meter) => [
+        _buildFareRow(meter),
+        const SizedBox(height: 10),
+        _buildStatsRow(meter),
+        const SizedBox(height: 10),
+        _buildSettingsRow(meter),
+        const SizedBox(height: 12),
+        _buildStartButton(meter),
+      ];
+
+  // ── Landscape layout: fare + stats side-by-side, settings + button in a row ──
+  List<Widget> _buildLandscapeContent(MeterProvider meter) => [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(flex: 5, child: _buildFareRow(meter)),
+            const SizedBox(width: 10),
+            Expanded(flex: 4, child: _buildStatsColumn(meter)),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Expanded(child: _buildSettingsRow(meter)),
+            const SizedBox(width: 10),
+            SizedBox(width: 150, child: _buildStartButton(meter)),
+          ],
+        ),
+      ];
 
   // ── Fare Row ──
   Widget _buildFareRow(MeterProvider meter) {
@@ -336,6 +365,65 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  // ── Stats chips (landscape: vertical column) ──
+  Widget _buildStatsColumn(MeterProvider meter) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _statChipWide(
+            icon: CupertinoIcons.speedometer,
+            label: 'Speed',
+            value: '${meter.currentSpeed.toStringAsFixed(0)} km/h'),
+        const SizedBox(height: 6),
+        _statChipWide(
+            icon: CupertinoIcons.clock,
+            label: 'Waiting',
+            value: '${meter.waitingMinutes.toStringAsFixed(1)} min'),
+        const SizedBox(height: 6),
+        _statChipWide(
+            icon: CupertinoIcons.location_north_line,
+            label: 'Distance',
+            value: '${meter.distanceKm.toStringAsFixed(2)} km'),
+      ],
+    );
+  }
+
+  Widget _statChipWide(
+      {required IconData icon,
+      required String label,
+      required String value}) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+      decoration: BoxDecoration(
+        color: _surface,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: const [
+          BoxShadow(
+              color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1)),
+        ],
+      ),
+      child: Row(
+        children: [
+          Icon(icon, size: 13, color: _accent),
+          const SizedBox(width: 8),
+          Text(label,
+              style: const TextStyle(
+                  fontSize: 11,
+                  color: _secondaryLabel,
+                  letterSpacing: 0.2)),
+          const Spacer(),
+          Text(value,
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: _label,
+                  height: 1)),
+        ],
       ),
     );
   }
