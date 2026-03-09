@@ -136,20 +136,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       const SizedBox(height: 12),
 
-                      // ── Logo header — always above fare card ──
-                      Padding(
-                        padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
-                        child: Row(
-                          children: [
-                            Image.asset(
-                              'assets/images/logo.png',
-                              height: 56,
-                              fit: BoxFit.contain,
-                            ),
-                          ],
-                        ),
-                      ),
-
                       if (isLandscape) ..._buildLandscapeContent(meter)
                       else ..._buildPortraitContent(meter),
                     ],
