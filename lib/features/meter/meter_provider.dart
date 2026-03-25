@@ -37,6 +37,8 @@ class MeterProvider extends ChangeNotifier {
   LatLng? get currentPosition => _currentPosition;
   List<LatLng> get routePoints => List.unmodifiable(_routePoints);
   DateTime? get lastUpdateTime => _lastUpdateTime;
+  bool get canResumeTrip =>
+      !_isRunning && (_distanceKm > 0 || _waitingMinutes > 0 || _routePoints.isNotEmpty);
 
   set kmPerLiter(double value) {
     if (value > 0) {
@@ -92,15 +94,48 @@ class MeterProvider extends ChangeNotifier {
     WakelockPlus.enable();
     notifyListeners();
 
+    await _beginTracking();
+  }
+
+  Future<void> resumeTrip() async {
+    if (_isRunning) return;
+
+    final hasPermission = await _ensurePermissions();
+    if (!hasPermission) return;
+
+    _isRunning = true;
+    WakelockPlus.enable();
+    notifyListeners();
+
+    await _beginTracking();
+  }
+
+  Future<void> _beginTracking() async {
+    _positionStream?.cancel();
+    _waitingTimer?.cancel();
+
+    // Prime the tracker immediately so the map marker/fare card updates
+    // before the stream's first periodic event arrives.
+    try {
+      final initialPosition = await Geolocator.getCurrentPosition(
+        locationSettings:
+            const LocationSettings(accuracy: LocationAccuracy.high),
+      );
+      _onPositionUpdate(initialPosition);
+    } catch (_) {}
+
     // Start GPS tracking
     const locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high,
-      distanceFilter: 5,
+      distanceFilter: 0,
     );
 
     _positionStream =
         Geolocator.getPositionStream(locationSettings: locationSettings)
-            .listen(_onPositionUpdate);
+            .listen((position) {
+      if (!_isRunning) return;
+      _onPositionUpdate(position);
+    });
 
     // Waiting timer — checks every 15 seconds if speed is below threshold
     _waitingTimer = Timer.periodic(const Duration(seconds: 15), (_) {
@@ -113,9 +148,9 @@ class MeterProvider extends ChangeNotifier {
   }
 
   void _onPositionUpdate(Position position) {
-    // Reject poor-accuracy fixes — GPS noise on a stationary device
-    // can easily be 15–50 m, which falsely accumulates as distance.
-    if (position.accuracy > 20.0) return;
+    // Keep UI location live even when accuracy is temporarily poor.
+    // Distance accumulation remains guarded below.
+    final isReliableFix = position.accuracy <= 35.0;
 
     _currentPosition = LatLng(position.latitude, position.longitude);
     // Negative speed means the device couldn't measure it — treat as 0.
@@ -123,25 +158,25 @@ class MeterProvider extends ChangeNotifier {
         ? 0.0
         : (position.speed * 3.6).clamp(0.0, 300.0); // m/s → km/h
     _lastUpdateTime = DateTime.now();
-    _routePoints.add(_currentPosition!);
+    if (isReliableFix) {
+      _routePoints.add(_currentPosition!);
+    }
 
-    if (_lastPosition != null) {
-      // Only count distance when actually moving (speed > 2 km/h).
-      // Below this threshold the reading is GPS jitter, not real motion.
-      if (_currentSpeed > 2.0) {
-        const distance = Distance();
-        final meters = distance.as(
-          LengthUnit.Meter,
-          _lastPosition!,
-          _currentPosition!,
-        );
-        // Ignore GPS teleportation glitches (> 150 m in one update).
-        if (meters < 150) {
-          _distanceKm += meters / 1000.0;
-        }
+    if (isReliableFix && _lastPosition != null) {
+      final meters = Geolocator.distanceBetween(
+        _lastPosition!.latitude,
+        _lastPosition!.longitude,
+        _currentPosition!.latitude,
+        _currentPosition!.longitude,
+      );
+      // Ignore GPS teleportation glitches from invalid samples.
+      if (meters.isFinite && meters > 0 && meters < 500) {
+        _distanceKm += meters / 1000.0;
       }
     }
-    _lastPosition = _currentPosition;
+    if (isReliableFix) {
+      _lastPosition = _currentPosition;
+    }
 
     _recalculateFare();
     notifyListeners();

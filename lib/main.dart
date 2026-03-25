@@ -5,6 +5,7 @@ import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
+import 'package:biyahe_meter/core/theme/theme_provider.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_screen.dart';
@@ -31,14 +32,20 @@ class BiyaheMeterApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AgreementsProvider()),
         ChangeNotifierProvider(create: (_) => MeterProvider()),
       ],
-      child: MaterialApp(
-        title: 'BiyaheMeter PH',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.darkTheme,
-        home: const _SplashGate(child: AgreementsScreen()),
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) => MaterialApp(
+          title: 'BiyaheMeter PH',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode:
+              themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
+          home: const _SplashGate(child: AgreementsScreen()),
+        ),
       ),
     );
   }

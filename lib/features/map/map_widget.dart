@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:biyahe_meter/core/theme/theme_provider.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 
 class MapWidget extends StatefulWidget {
@@ -12,7 +13,8 @@ class MapWidget extends StatefulWidget {
   State<MapWidget> createState() => _MapWidgetState();
 }
 
-class _MapWidgetState extends State<MapWidget> {
+class _MapWidgetState extends State<MapWidget>
+  with TickerProviderStateMixin {
   // Default center: Manila, Philippines
   static const LatLng _defaultCenter = LatLng(14.5995, 120.9842);
 
@@ -20,7 +22,9 @@ class _MapWidgetState extends State<MapWidget> {
   MeterProvider? _meterProvider;
 
   /// Whether the map should automatically pan to follow the user.
-  bool _followUser = true;
+  bool _isFollowing = true;
+
+  AnimationController? _recenterController;
 
   /// Location fetched once on startup (before a trip begins).
   LatLng? _initialPosition;
@@ -40,6 +44,7 @@ class _MapWidgetState extends State<MapWidget> {
   @override
   void dispose() {
     _meterProvider?.removeListener(_onPositionUpdate);
+    _recenterController?.dispose();
     super.dispose();
   }
 
@@ -87,7 +92,7 @@ class _MapWidgetState extends State<MapWidget> {
   void _onPositionUpdate() {
     if (!mounted) return;
     final pos = context.read<MeterProvider>().currentPosition;
-    if (pos != null && _followUser) {
+    if (pos != null && _isFollowing) {
       final zoom = _mapController.camera.zoom;
       _mapController.move(
         LatLng(pos.latitude - _latOffsetForPanel(zoom), pos.longitude),
@@ -96,24 +101,60 @@ class _MapWidgetState extends State<MapWidget> {
     }
   }
 
+  void _animateMapMove(LatLng target, double targetZoom) {
+    _recenterController?.dispose();
+    final startCenter = _mapController.camera.center;
+    final startZoom = _mapController.camera.zoom;
+
+    final latTween =
+        Tween<double>(begin: startCenter.latitude, end: target.latitude);
+    final lngTween =
+        Tween<double>(begin: startCenter.longitude, end: target.longitude);
+    final zoomTween = Tween<double>(begin: startZoom, end: targetZoom);
+
+    _recenterController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
+
+    final animation = CurvedAnimation(
+      parent: _recenterController!,
+      curve: Curves.easeOutCubic,
+    );
+
+    _recenterController!.addListener(() {
+      if (!mounted) return;
+      _mapController.move(
+        LatLng(
+          latTween.evaluate(animation),
+          lngTween.evaluate(animation),
+        ),
+        zoomTween.evaluate(animation),
+      );
+    });
+
+    _recenterController!.forward();
+  }
+
   /// Re-enable auto-follow and snap back to the current position.
   void _recenter() {
     final pos = context.read<MeterProvider>().currentPosition ??
         _initialPosition ??
         _defaultCenter;
-    setState(() => _followUser = true);
+    setState(() => _isFollowing = true);
     const zoom = 15.0;
-    _mapController.move(
-      LatLng(pos.latitude - _latOffsetForPanel(zoom), pos.longitude),
-      zoom,
-    );
+    final target = LatLng(pos.latitude - _latOffsetForPanel(zoom), pos.longitude);
+    _animateMapMove(target, zoom);
   }
 
   @override
   Widget build(BuildContext context) {
     final meter = context.watch<MeterProvider>();
+    final isDarkMode = context.watch<ThemeProvider>().isDarkMode;
+    final markerPosition = meter.currentPosition ?? _initialPosition;
     final initialCenter =
         _initialPosition ?? meter.currentPosition ?? _defaultCenter;
+    final topInset = MediaQuery.of(context).padding.top;
 
     return Stack(
       fit: StackFit.expand, // ← fills every pixel of the parent SizedBox
@@ -124,17 +165,18 @@ class _MapWidgetState extends State<MapWidget> {
             initialCenter: initialCenter,
             initialZoom: 15.0,
             onPositionChanged: (camera, hasGesture) {
-              if (hasGesture && _followUser) {
-                setState(() => _followUser = false);
+              if (hasGesture && _isFollowing) {
+                setState(() => _isFollowing = false);
               }
             },
           ),
           children: [
             // CartoDB dark tiles — CORS-safe on all platforms including web
             TileLayer(
-              urlTemplate:
-                  'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png',
-              subdomains: const ['a', 'b', 'c', 'd'],
+              urlTemplate: isDarkMode
+                  ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                  : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              subdomains: isDarkMode ? const ['a', 'b', 'c', 'd'] : const [],
               userAgentPackageName: 'com.biyahemeter.app',
               maxZoom: 19,
             ),
@@ -146,10 +188,11 @@ class _MapWidgetState extends State<MapWidget> {
                   '© OpenStreetMap contributors',
                   onTap: null,
                 ),
-                TextSourceAttribution(
-                  '© CARTO',
-                  onTap: null,
-                ),
+                if (isDarkMode)
+                  TextSourceAttribution(
+                    '© CARTO',
+                    onTap: null,
+                  ),
               ],
             ),
 
@@ -165,12 +208,12 @@ class _MapWidgetState extends State<MapWidget> {
                 ],
               ),
 
-            // Live position marker
-            if (meter.currentPosition != null)
+            // Live position marker (falls back to initial device location).
+            if (markerPosition != null)
               MarkerLayer(
                 markers: [
                   Marker(
-                    point: meter.currentPosition!,
+                    point: markerPosition,
                     width: 28,
                     height: 28,
                     alignment: Alignment.center, // anchor dot at its center
@@ -197,7 +240,7 @@ class _MapWidgetState extends State<MapWidget> {
         // ── Right-side map controls: zoom + re-center ──
         Positioned(
           right: 12,
-          top: 72,
+          top: topInset + 12,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -217,13 +260,18 @@ class _MapWidgetState extends State<MapWidget> {
                 ),
               ),
               const SizedBox(height: 8),
-              _mapBtn(
-                icon: _followUser
-                    ? Icons.my_location_rounded
-                    : Icons.location_searching_rounded,
-                onTap: _recenter,
-                iconColor:
-                    _followUser ? const Color(0xFF1A237E) : Colors.grey,
+              FloatingActionButton(
+                heroTag: 'recenterFab',
+                mini: true,
+                elevation: 2,
+                backgroundColor: Colors.white,
+                onPressed: _recenter,
+                child: Icon(
+                  _isFollowing
+                      ? Icons.my_location_rounded
+                      : Icons.location_searching_rounded,
+                  color: _isFollowing ? const Color(0xFF1A237E) : Colors.grey,
+                ),
               ),
               const SizedBox(height: 8),
               _mapBtn(

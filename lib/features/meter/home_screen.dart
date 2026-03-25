@@ -1,7 +1,10 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
+import 'package:biyahe_meter/core/theme/theme_provider.dart';
 import 'package:biyahe_meter/features/map/map_widget.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 
@@ -12,28 +15,39 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> {
+class _HomeScreenState extends State<HomeScreen>
+  with SingleTickerProviderStateMixin {
   late TextEditingController _kmController;
   late TextEditingController _gasController;
   late TextEditingController _baseFareController;
   bool _editingKm = false;
   bool _editingGas = false;
   bool _editingBase = false;
+  late final AnimationController _dashboardSlideController;
+  double _maxDashboardDrag = 280;
   final FocusNode _kmFocus = FocusNode();
   final FocusNode _gasFocus = FocusNode();
   final FocusNode _baseFareFocus = FocusNode();
 
-  static const _bg = Color(0xFFF2F2F7);        // iOS system grouped bg
   static const _surface = Colors.white;
   static const _label = Color(0xFF1C1C1E);      // iOS label
   static const _secondaryLabel = Color(0xFF8E8E93); // iOS secondary label
   static const _accent = Color(0xFFFFB800);     // gold
-  static const _navy = Color(0xFF1A237E);
   static const _separator = Color(0xFFE5E5EA);
 
   @override
   void initState() {
     super.initState();
+    _dashboardSlideController = AnimationController(
+      vsync: this,
+      value: 0,
+      lowerBound: 0,
+      upperBound: 1,
+      duration: const Duration(milliseconds: 320),
+    )..addListener(() {
+        if (mounted) setState(() {});
+      });
+
     final meter = context.read<MeterProvider>();
     _kmController =
         TextEditingController(text: meter.kmPerLiter.toStringAsFixed(1));
@@ -45,6 +59,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
+    _dashboardSlideController.dispose();
     _kmController.dispose();
     _gasController.dispose();
     _baseFareController.dispose();
@@ -75,114 +90,163 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() => _editingBase = false);
   }
 
+  void _onDashboardDragUpdate(DragUpdateDetails details) {
+    final deltaProgress = details.delta.dy / _maxDashboardDrag;
+    _dashboardSlideController.value =
+        (_dashboardSlideController.value + deltaProgress).clamp(0.0, 1.0);
+  }
+
+  void _onDashboardDragEnd(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    final current = _dashboardSlideController.value;
+    final shouldHide = velocity > 420 || current > 0.5;
+
+    _dashboardSlideController.animateTo(
+      shouldHide ? 1.0 : 0.0,
+      duration: const Duration(milliseconds: 320),
+      curve: Curves.easeOutCubic,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final meter = context.watch<MeterProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
     final mq = MediaQuery.of(context);
-    final isLandscape = mq.orientation == Orientation.landscape;
+    final isNarrow = mq.size.width <= 393;
     final bottomPad = mq.padding.bottom;
-
-    final double sheetMin = isLandscape ? 0.35 : 0.22;
-    final double sheetInitial = isLandscape ? 0.65 : 0.52;
-    final double sheetMax = isLandscape ? 0.98 : 0.92;
-    final bool compact = isLandscape;
+    _maxDashboardDrag = (mq.size.height * 0.36).clamp(220.0, 360.0);
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // ── Full-screen map ──
+          // Full-screen map layer.
           const MapWidget(),
-
-          // ── Draggable bottom sheet ──
-          DraggableScrollableSheet(
-            key: ValueKey(isLandscape),
-            initialChildSize: sheetInitial,
-            minChildSize: sheetMin,
-            maxChildSize: sheetMax,
-            snap: true,
-            snapSizes: [sheetMin, sheetInitial],
-            builder: (context, scrollController) {
-              return Container(
-                decoration: const BoxDecoration(
-                  color: _bg,
-                  borderRadius:
-                      BorderRadius.vertical(top: Radius.circular(22)),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Color(0x22000000),
-                      blurRadius: 20,
-                      offset: Offset(0, -4),
+          Positioned(
+            left: 12,
+            right: 12,
+            bottom: bottomPad + 10,
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onVerticalDragUpdate: _onDashboardDragUpdate,
+              onVerticalDragEnd: _onDashboardDragEnd,
+              child: Transform.translate(
+                offset: Offset(0, _dashboardSlideController.value * _maxDashboardDrag),
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 360),
+                  switchInCurve: Curves.easeOutCubic,
+                  switchOutCurve: Curves.easeInCubic,
+                  transitionBuilder: (child, animation) => FadeTransition(
+                    opacity: animation,
+                    child: ScaleTransition(
+                      scale: Tween<double>(begin: 0.98, end: 1.0)
+                          .animate(animation),
+                      child: child,
                     ),
-                  ],
-                ),
-                child: SingleChildScrollView(
-                  controller: scrollController,
-                  padding: EdgeInsets.fromLTRB(
-                        compact ? 12 : 16, 0,
-                        compact ? 12 : 16, 12 + bottomPad),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      // ── Drag handle ──
-                      const SizedBox(height: 8),
-                      Container(
-                        width: 36,
-                        height: 4,
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFD1D1D6),
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-
-                      ..._buildContent(meter, compact),
-                    ],
+                  ),
+                  child: _buildMainDashboard(
+                    meter,
+                    isNarrow,
+                    themeProvider,
                   ),
                 ),
-              );
-            },
+              ),
+            ),
           ),
-
         ],
       ),
     );
   }
 
-  // ── Unified adaptive content ──
-  List<Widget> _buildContent(MeterProvider meter, bool compact) {
-    if (compact) {
-      return [
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(flex: 5, child: _buildFareRow(meter, compact: compact)),
-            const SizedBox(width: 8),
-            Expanded(flex: 4, child: _buildStatsColumn(meter)),
-          ],
+  Widget _buildMainDashboard(
+    MeterProvider meter,
+    bool compact,
+    ThemeProvider themeProvider,
+  ) {
+    return Container(
+      key: ValueKey(themeProvider.isDarkMode),
+      padding: EdgeInsets.fromLTRB(12, compact ? 10 : 12, 12, 12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: Colors.white.withValues(alpha: themeProvider.isDarkMode ? 0.18 : 0.7),
+          width: 1,
         ),
-        const SizedBox(height: 8),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Expanded(child: _buildSettingsRow(meter, compact: compact)),
-            const SizedBox(width: 8),
-            SizedBox(width: 140, child: _buildStartButton(meter, compact: compact)),
-          ],
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: themeProvider.isDarkMode ? 0.22 : 0.1),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.42),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Text(
+                    'BiyaheMeter',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                  ),
+                  const Spacer(),
+                  _themeToggle(themeProvider),
+                ],
+              ),
+              const SizedBox(height: 10),
+              _buildFareRow(meter, compact: compact),
+              const SizedBox(height: 10),
+              _buildStatsRow(meter),
+              const SizedBox(height: 10),
+              _buildSettingsRow(meter, compact: compact),
+              const SizedBox(height: 12),
+              _buildStartButton(meter, compact: compact),
+            ],
+          ),
         ),
-      ];
-    }
-    return [
-      _buildFareRow(meter),
-      const SizedBox(height: 10),
-      _buildStatsRow(meter),
-      const SizedBox(height: 10),
-      _buildSettingsRow(meter),
-      const SizedBox(height: 12),
-      _buildStartButton(meter),
-    ];
+      ),
+    );
+  }
+
+  Widget _themeToggle(ThemeProvider themeProvider) {
+    return GestureDetector(
+      onTap: themeProvider.toggleTheme,
+      child: Container(
+        width: 38,
+        height: 38,
+        decoration: BoxDecoration(
+          color: Theme.of(context).cardColor.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        ),
+        child: Icon(
+          themeProvider.isDarkMode
+              ? CupertinoIcons.sun_max_fill
+              : CupertinoIcons.moon_fill,
+          size: 18,
+          color: themeProvider.isDarkMode ? Colors.amberAccent : Colors.blueAccent,
+        ),
+      ),
+    );
   }
 
   // ── Fare Row ──
@@ -198,64 +262,79 @@ class _HomeScreenState extends State<HomeScreen> {
           : 'Updated ${diff.inMinutes}m ago';
     }
 
-    return Container(
-      padding: EdgeInsets.symmetric(horizontal: 16, vertical: compact ? 10 : 14),
-      decoration: BoxDecoration(
-        color: _navy,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('Estimated Fare',
-                    style: TextStyle(
-                        color: Colors.white60,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        letterSpacing: 0.3)),
-                const SizedBox(height: 2),
-                FittedBox(
-                  fit: BoxFit.scaleDown,
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    '₱ ${meter.totalFare.toStringAsFixed(2)}',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 38,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -1,
-                      height: 1,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(updateText,
-                    style: const TextStyle(
-                        color: Colors.white38,
-                        fontSize: 10,
-                        fontStyle: FontStyle.italic)),
-              ],
+    final fareColor = Theme.of(context).brightness == Brightness.dark
+      ? const Color(0xFFF1F4FA)
+      : Colors.black;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 16, vertical: compact ? 10 : 14),
+          decoration: BoxDecoration(
+            color: const Color(0xFF111111).withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: 0.22),
+              width: 1,
             ),
           ),
-          const SizedBox(width: 10),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              _fareDetail(
-                  'Base', '₱${meter.baseFare.toStringAsFixed(0)}'),
-              const SizedBox(height: 4),
-              _fareDetail('Rate',
-                  '₱${(meter.gasPricePerLiter / meter.kmPerLiter).toStringAsFixed(2)}/km'),
-              const SizedBox(height: 4),
-              _fareDetail('Dist.',
-                  '${meter.distanceKm.toStringAsFixed(2)} km'),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text('Estimated Fare',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.3)),
+                    const SizedBox(height: 2),
+                    FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        '₱ ${meter.totalFare.toStringAsFixed(2)}',
+                        style: TextStyle(
+                          color: fareColor,
+                          fontSize: 38,
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'monospace',
+                          letterSpacing: -0.6,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(updateText,
+                        style: const TextStyle(
+                            color: Colors.white54,
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic)),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _fareDetail(
+                      'Base', '₱${meter.baseFare.toStringAsFixed(0)}'),
+                  const SizedBox(height: 4),
+                  _fareDetail('Rate',
+                      '₱${(meter.gasPricePerLiter / meter.kmPerLiter).toStringAsFixed(2)}/km'),
+                  const SizedBox(height: 4),
+                  _fareDetail('Dist.',
+                      '${meter.distanceKm.toStringAsFixed(2)} km'),
+                ],
+              ),
             ],
           ),
-        ],
+        ),
       ),
     );
   }
@@ -288,12 +367,12 @@ class _HomeScreenState extends State<HomeScreen> {
         _statChip(
             icon: CupertinoIcons.clock,
             value: meter.waitingMinutes.toStringAsFixed(1),
-            unit: 'min wait'),
+            unit: 'Time'),
         const SizedBox(width: 8),
         _statChip(
             icon: CupertinoIcons.location_north_line,
             value: meter.distanceKm.toStringAsFixed(2),
-            unit: 'km'),
+            unit: 'Distance'),
       ],
     );
   }
@@ -306,11 +385,14 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 8),
         decoration: BoxDecoration(
-          color: _surface,
+          color: Theme.of(context).cardColor,
           borderRadius: BorderRadius.circular(12),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
-                color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1)),
+              color: Colors.black.withValues(alpha: 0.1),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
           ],
         ),
         child: Row(
@@ -322,79 +404,20 @@ class _HomeScreenState extends State<HomeScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(value,
-                    style: const TextStyle(
+                  style: TextStyle(
                         fontSize: 13,
                         fontWeight: FontWeight.w700,
-                        color: _label,
+                    color: Theme.of(context).colorScheme.onSurface,
                         height: 1)),
                 Text(unit,
                     style: const TextStyle(
                         fontSize: 9,
-                        color: _secondaryLabel,
+                    color: _secondaryLabel,
                         letterSpacing: 0.2)),
               ],
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  // ── Stats chips (landscape: vertical column) ──
-  Widget _buildStatsColumn(MeterProvider meter) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        _statChipWide(
-            icon: CupertinoIcons.speedometer,
-            label: 'Speed',
-            value: '${meter.currentSpeed.toStringAsFixed(0)} km/h'),
-        const SizedBox(height: 6),
-        _statChipWide(
-            icon: CupertinoIcons.clock,
-            label: 'Waiting',
-            value: '${meter.waitingMinutes.toStringAsFixed(1)} min'),
-        const SizedBox(height: 6),
-        _statChipWide(
-            icon: CupertinoIcons.location_north_line,
-            label: 'Distance',
-            value: '${meter.distanceKm.toStringAsFixed(2)} km'),
-      ],
-    );
-  }
-
-  Widget _statChipWide(
-      {required IconData icon,
-      required String label,
-      required String value}) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-      decoration: BoxDecoration(
-        color: _surface,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: const [
-          BoxShadow(
-              color: Color(0x0A000000), blurRadius: 4, offset: Offset(0, 1)),
-        ],
-      ),
-      child: Row(
-        children: [
-          Icon(icon, size: 13, color: _accent),
-          const SizedBox(width: 8),
-          Text(label,
-              style: const TextStyle(
-                  fontSize: 11,
-                  color: _secondaryLabel,
-                  letterSpacing: 0.2)),
-          const Spacer(),
-          Text(value,
-              style: const TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700,
-                  color: _label,
-                  height: 1)),
-        ],
       ),
     );
   }
@@ -554,15 +577,35 @@ class _HomeScreenState extends State<HomeScreen> {
   // ── Start / Stop pill button ──
   Widget _buildStartButton(MeterProvider meter, {bool compact = false}) {
     final isRunning = meter.isRunning;
+    final isResume = meter.canResumeTrip;
     return GestureDetector(
-      onTap: () => isRunning ? meter.stopTrip() : meter.startTrip(),
+      onTap: () {
+        if (isRunning) {
+          meter.stopTrip();
+          return;
+        }
+        if (isResume) {
+          meter.resumeTrip();
+        } else {
+          meter.startTrip();
+        }
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         curve: Curves.easeInOut,
         height: compact ? 44 : 52,
         decoration: BoxDecoration(
-          color: Colors.black,
+          color: isRunning
+              ? const Color(0xFFD32F2F)
+              : const Color(0xFF1E7A43),
           borderRadius: BorderRadius.circular(14),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 5),
+            ),
+          ],
         ),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -576,7 +619,9 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(width: 8),
             Text(
-              isRunning ? 'Stop Trip' : 'Start New Trip',
+              isRunning
+                  ? 'Stop Trip'
+                  : (isResume ? 'Resume Trip' : 'Start Trip'),
               style: const TextStyle(
                 color: Colors.white,
                 fontSize: 16,

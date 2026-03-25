@@ -29,7 +29,7 @@ class AgreementsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(),
+              _buildHeader(context),
               const SizedBox(height: 30),
               _buildAgreementsCard(context, ag),
               const SizedBox(height: 14),
@@ -44,23 +44,24 @@ class AgreementsScreen extends StatelessWidget {
   }
 
   // ── Header ───────────────────────────────────────────────────
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) {
+    final isNarrow = MediaQuery.sizeOf(context).width < 360;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
-      children: const [
+      children: [
         Image(
           image: AssetImage('assets/images/logo.png'),
-          height: 160,
+          height: isNarrow ? 130 : 160,
           fit: BoxFit.contain,
           alignment: Alignment.center,
         ),
-        SizedBox(height: 12),
+        const SizedBox(height: 12),
         Text(
           'Before you begin, please read and agree to the following.',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: _sub,
-            fontSize: 20,
+            fontSize: isNarrow ? 18 : 20,
             height: 1.45,
           ),
         ),
@@ -251,9 +252,11 @@ class AgreementsScreen extends StatelessWidget {
           ? () => Navigator.pushReplacement(
                 context,
                 PageRouteBuilder(
-                  pageBuilder: (_, __, ___) => const HomeScreen(),
-                  transitionsBuilder: (_, anim, __, child) =>
-                      FadeTransition(opacity: anim, child: child),
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      const HomeScreen(),
+                  transitionsBuilder:
+                      (context, animation, secondaryAnimation, child) =>
+                      FadeTransition(opacity: animation, child: child),
                   transitionDuration: const Duration(milliseconds: 350),
                 ),
               )
