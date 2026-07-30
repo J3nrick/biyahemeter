@@ -37,15 +37,28 @@ class BiyaheMeterApp extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => MeterProvider()),
       ],
       child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, _) => MaterialApp(
-          title: 'BiyaheMeter PH',
-          debugShowCheckedModeBanner: false,
-          theme: AppTheme.lightTheme,
-          darkTheme: AppTheme.darkTheme,
-          themeMode:
-              themeProvider.isDarkMode ? ThemeMode.dark : ThemeMode.light,
-          home: const _SplashGate(child: AgreementsScreen()),
-        ),
+        builder: (context, themeProvider, _) {
+          final isDark = themeProvider.isDarkMode;
+          SystemChrome.setSystemUIOverlayStyle(
+            SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness:
+                  isDark ? Brightness.light : Brightness.dark,
+              systemNavigationBarColor:
+                  isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
+              systemNavigationBarIconBrightness:
+                  isDark ? Brightness.light : Brightness.dark,
+            ),
+          );
+          return MaterialApp(
+            title: 'BiyaheMeter PH',
+            debugShowCheckedModeBanner: false,
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
+            themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+            home: const _SplashGate(child: AgreementsScreen()),
+          );
+        },
       ),
     );
   }

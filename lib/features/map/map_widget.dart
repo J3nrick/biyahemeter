@@ -202,8 +202,8 @@ class _MapWidgetState extends State<MapWidget>
                 polylines: [
                   Polyline(
                     points: meter.routePoints,
-                    strokeWidth: 4.0,
-                    color: const Color(0xFF1A237E),
+                    strokeWidth: 4.5,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                 ],
               ),
@@ -219,14 +219,17 @@ class _MapWidgetState extends State<MapWidget>
                     alignment: Alignment.center, // anchor dot at its center
                     child: Container(
                       decoration: BoxDecoration(
-                        color: const Color.fromARGB(255, 0, 85, 255),
+                        color: Theme.of(context).colorScheme.primary,
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white, width: 3),
-                        boxShadow: const [
+                        boxShadow: [
                           BoxShadow(
-                            color: Color(0x55FFB800),
+                            color: Theme.of(context)
+                                .colorScheme
+                                .primary
+                                .withValues(alpha: 0.45),
                             blurRadius: 12,
-                            spreadRadius: 4,
+                            spreadRadius: 3,
                           ),
                         ],
                       ),
@@ -245,37 +248,39 @@ class _MapWidgetState extends State<MapWidget>
             mainAxisSize: MainAxisSize.min,
             children: [
               _mapBtn(
+                context: context,
                 icon: Icons.add_rounded,
+                semanticLabel: 'Zoom in',
                 onTap: () => _mapController.move(
                   _mapController.camera.center,
                   (_mapController.camera.zoom + 1).clamp(1.0, 19.0),
                 ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 8),
               _mapBtn(
+                context: context,
                 icon: Icons.remove_rounded,
+                semanticLabel: 'Zoom out',
                 onTap: () => _mapController.move(
                   _mapController.camera.center,
                   (_mapController.camera.zoom - 1).clamp(1.0, 19.0),
                 ),
               ),
-              const SizedBox(height: 8),
-              FloatingActionButton(
-                heroTag: 'recenterFab',
-                mini: true,
-                elevation: 2,
-                backgroundColor: Colors.white,
-                onPressed: _recenter,
-                child: Icon(
-                  _isFollowing
-                      ? Icons.my_location_rounded
-                      : Icons.location_searching_rounded,
-                  color: _isFollowing ? const Color(0xFF1A237E) : Colors.grey,
-                ),
-              ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 10),
               _mapBtn(
+                context: context,
+                icon: _isFollowing
+                    ? Icons.my_location_rounded
+                    : Icons.location_searching_rounded,
+                semanticLabel: 'Recenter map',
+                accent: _isFollowing,
+                onTap: _recenter,
+              ),
+              const SizedBox(height: 10),
+              _mapBtn(
+                context: context,
                 icon: Icons.refresh_rounded,
+                semanticLabel: 'Reset trip',
                 onTap: () => context.read<MeterProvider>().resetTrip(),
               ),
             ],
@@ -286,28 +291,48 @@ class _MapWidgetState extends State<MapWidget>
   }
 
   Widget _mapBtn({
+    required BuildContext context,
     required IconData icon,
     required VoidCallback onTap,
-    Color? iconColor,
+    required String semanticLabel,
+    bool accent = false,
   }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(8),
-          boxShadow: const [
-            BoxShadow(
-              color: Color(0x25000000),
-              blurRadius: 6,
-              offset: Offset(0, 2),
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    return Semantics(
+      button: true,
+      label: semanticLabel,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(14),
+          child: Ink(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withValues(alpha: isDark ? 0.88 : 0.94),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: theme.colorScheme.outline.withValues(alpha: 0.7),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
-          ],
+            child: Icon(
+              icon,
+              size: 20,
+              color: accent
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurface,
+            ),
+          ),
         ),
-        child: Icon(icon,
-            size: 18, color: iconColor ?? const Color(0xFF1C1C1E)),
       ),
     );
   }

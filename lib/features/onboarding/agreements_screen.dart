@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 
+import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/features/meter/home_screen.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
@@ -9,31 +10,29 @@ import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 class AgreementsScreen extends StatelessWidget {
   const AgreementsScreen({super.key});
 
-  static const _blue   = Color(0xFF1A56DB);  // professional blue
-  static const _label   = Color(0xFF1C1C1E);
-  static const _sub     = Color(0xFF6B6B6B);
-  static const _divClr  = Color(0xFFE8E8E8);
-  static const _cardBg  = Color(0xFFF9F9F9);
-  static const _border  = Color(0xFFDDDDDD);
-
   @override
   Widget build(BuildContext context) {
-    final ag    = context.watch<AgreementsProvider>();
+    final ag = context.watch<AgreementsProvider>();
     final meter = context.watch<MeterProvider>();
+    final theme = Theme.of(context);
+    final muted = AppTheme.mutedOf(context);
+    final width = MediaQuery.sizeOf(context).width;
+    final isNarrow = width < 360;
+    final horizontal = width >= 700 ? (width - 520) / 2 : 22.0;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(22, 36, 22, 28),
+          padding: EdgeInsets.fromLTRB(horizontal, 28, horizontal, 28),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              _buildHeader(context),
-              const SizedBox(height: 30),
+              _buildHeader(context, isNarrow, muted),
+              const SizedBox(height: 28),
               _buildAgreementsCard(context, ag),
               const SizedBox(height: 14),
-              _buildDataCard(meter),
+              _buildDataCard(context, meter),
               const SizedBox(height: 26),
               _buildAcceptButton(context, ag.allAccepted),
             ],
@@ -43,39 +42,51 @@ class AgreementsScreen extends StatelessWidget {
     );
   }
 
-  // ── Header ───────────────────────────────────────────────────
-  Widget _buildHeader(BuildContext context) {
-    final isNarrow = MediaQuery.sizeOf(context).width < 360;
+  Widget _buildHeader(BuildContext context, bool isNarrow, Color muted) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Image(
-          image: AssetImage('assets/images/logo.png'),
-          height: isNarrow ? 130 : 160,
-          fit: BoxFit.contain,
-          alignment: Alignment.center,
+        Hero(
+          tag: 'biyahemeter-logo',
+          child: Image(
+            image: const AssetImage('assets/images/logo.png'),
+            height: isNarrow ? 120 : 148,
+            fit: BoxFit.contain,
+            alignment: Alignment.center,
+          ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
+        Text(
+          'BiyaheMeter',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.headlineLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.6,
+          ),
+        ),
+        const SizedBox(height: 8),
         Text(
           'Before you begin, please read and agree to the following.',
           textAlign: TextAlign.center,
-          style: TextStyle(
-            color: _sub,
-            fontSize: isNarrow ? 18 : 20,
+          style: theme.textTheme.bodyLarge?.copyWith(
+            color: muted,
             height: 1.45,
+            fontSize: isNarrow ? 15 : 16,
           ),
         ),
       ],
     );
   }
 
-  // ── Agreements Card ──────────────────────────────────────────
   Widget _buildAgreementsCard(BuildContext context, AgreementsProvider ag) {
+    final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _border, width: 1),
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.borderOf(context)),
+        boxShadow: AppTheme.softShadow(context),
       ),
       child: Column(
         children: [
@@ -84,23 +95,28 @@ class AgreementsScreen extends StatelessWidget {
             title: 'Terms & Conditions',
             subtitle: 'I agree to the usage rules and liability terms.',
             value: ag.acceptedTerms,
-            onTap: () => context.read<AgreementsProvider>().toggleTerms(!ag.acceptedTerms),
+            onTap: () =>
+                context.read<AgreementsProvider>().toggleTerms(!ag.acceptedTerms),
           ),
-          Divider(height: 1, thickness: 1, color: _divClr),
+          Divider(height: 1, color: AppTheme.borderOf(context)),
           _checkRow(
             context: context,
             title: 'Data Privacy & GPS Tracking',
             subtitle: 'I allow location access for trip distance tracking.',
             value: ag.acceptedPrivacy,
-            onTap: () => context.read<AgreementsProvider>().togglePrivacy(!ag.acceptedPrivacy),
+            onTap: () => context
+                .read<AgreementsProvider>()
+                .togglePrivacy(!ag.acceptedPrivacy),
           ),
-          Divider(height: 1, thickness: 1, color: _divClr),
+          Divider(height: 1, color: AppTheme.borderOf(context)),
           _checkRow(
             context: context,
             title: 'PH Gas Price Acknowledgment',
             subtitle: 'I understand that gas prices are manually updated.',
             value: ag.verifiedGasData,
-            onTap: () => context.read<AgreementsProvider>().toggleGasData(!ag.verifiedGasData),
+            onTap: () => context
+                .read<AgreementsProvider>()
+                .toggleGasData(!ag.verifiedGasData),
             isLast: true,
           ),
         ],
@@ -116,101 +132,114 @@ class AgreementsScreen extends StatelessWidget {
     required VoidCallback onTap,
     bool isLast = false,
   }) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(14),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 180),
-              width: 22,
-              height: 22,
-              margin: const EdgeInsets.only(top: 1),
-              decoration: BoxDecoration(
-                color: value ? _blue : Colors.white,
-                borderRadius: BorderRadius.circular(6),
-                border: Border.all(
-                  color: value ? _blue : const Color(0xFFBBBBBB),
-                  width: 1.5,
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+    final muted = AppTheme.mutedOf(context);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.vertical(
+          top: title.startsWith('Terms')
+              ? const Radius.circular(20)
+              : Radius.zero,
+          bottom: isLast ? const Radius.circular(20) : Radius.zero,
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 24,
+                height: 24,
+                margin: const EdgeInsets.only(top: 1),
+                decoration: BoxDecoration(
+                  color: value ? primary : theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(7),
+                  border: Border.all(
+                    color: value ? primary : AppTheme.borderOf(context),
+                    width: 1.5,
+                  ),
+                ),
+                child: value
+                    ? Icon(Icons.check_rounded,
+                        color: theme.colorScheme.onPrimary, size: 15)
+                    : const SizedBox.shrink(),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        height: 1.2,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: muted,
+                        height: 1.4,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: value
-                  ? const Icon(Icons.check_rounded,
-                      color: Colors.white, size: 14)
-                  : const SizedBox.shrink(),
-            ),
-            const SizedBox(width: 13),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: const TextStyle(
-                      color: _label,
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      height: 1.2,
-                    ),
-                  ),
-                  const SizedBox(height: 3),
-                  Text(
-                    subtitle,
-                    style: const TextStyle(
-                      color: _sub,
-                      fontSize: 12,
-                      height: 1.4,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  // ── Active PH Data Card ──────────────────────────────────────
-  Widget _buildDataCard(MeterProvider meter) {
+  Widget _buildDataCard(BuildContext context, MeterProvider meter) {
+    final theme = Theme.of(context);
+    final muted = AppTheme.mutedOf(context);
+
     return Container(
       decoration: BoxDecoration(
-        color: _cardBg,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: _border, width: 1),
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppTheme.borderOf(context)),
+        boxShadow: AppTheme.softShadow(context),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 13, 16, 10),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
             child: Text(
               'Current trip defaults',
-              style: TextStyle(
-                color: _sub,
-                fontSize: 11,
+              style: theme.textTheme.labelMedium?.copyWith(
+                color: muted,
                 fontWeight: FontWeight.w600,
-                letterSpacing: 0.2,
               ),
             ),
           ),
-          Divider(height: 1, thickness: 1, color: _divClr),
+          Divider(height: 1, color: AppTheme.borderOf(context)),
           _dataRow(
+            context: context,
             icon: FontAwesomeIcons.gasPump,
             label: 'Fuel Efficiency',
             value: '${meter.kmPerLiter.toStringAsFixed(1)} km/L',
           ),
-          Divider(height: 1, thickness: 1, color: _divClr),
+          Divider(height: 1, color: AppTheme.borderOf(context)),
           _dataRow(
+            context: context,
             icon: FontAwesomeIcons.pesoSign,
             label: 'Gas Price',
             value: '₱${meter.gasPricePerLiter.toStringAsFixed(2)}/L',
           ),
-          Divider(height: 1, thickness: 1, color: _divClr),
+          Divider(height: 1, color: AppTheme.borderOf(context)),
           _dataRow(
+            context: context,
             icon: FontAwesomeIcons.coins,
             label: 'Base Fare',
             value: '₱${meter.baseFare.toStringAsFixed(0)}',
@@ -221,61 +250,86 @@ class AgreementsScreen extends StatelessWidget {
   }
 
   Widget _dataRow({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required String value,
   }) {
+    final theme = Theme.of(context);
+    final muted = AppTheme.mutedOf(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       child: Row(
         children: [
-          FaIcon(icon, size: 13, color: _sub),
+          FaIcon(icon, size: 14, color: muted),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(label,
-                style: const TextStyle(color: _label, fontSize: 13)),
+            child: Text(label, style: theme.textTheme.bodyMedium),
           ),
-          Text(value,
-              style: const TextStyle(
-                  color: _label,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700)),
+          Text(
+            value,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  // ── Accept Button ─────────────────────────────────────────────
   Widget _buildAcceptButton(BuildContext context, bool enabled) {
-    return GestureDetector(
-      onTap: enabled
-          ? () => Navigator.pushReplacement(
-                context,
-                PageRouteBuilder(
-                  pageBuilder: (context, animation, secondaryAnimation) =>
-                      const HomeScreen(),
-                  transitionsBuilder:
-                      (context, animation, secondaryAnimation, child) =>
-                      FadeTransition(opacity: animation, child: child),
-                  transitionDuration: const Duration(milliseconds: 350),
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+
+    return Semantics(
+      button: true,
+      enabled: enabled,
+      label: 'Accept and continue',
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: enabled
+              ? () => Navigator.pushReplacement(
+                    context,
+                    PageRouteBuilder(
+                      pageBuilder: (context, animation, secondaryAnimation) =>
+                          const HomeScreen(),
+                      transitionsBuilder: (context, animation,
+                              secondaryAnimation, child) =>
+                          FadeTransition(opacity: animation, child: child),
+                      transitionDuration: const Duration(milliseconds: 350),
+                    ),
+                  )
+              : null,
+          borderRadius: BorderRadius.circular(16),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 220),
+            height: 54,
+            decoration: BoxDecoration(
+              color: enabled
+                  ? primary
+                  : theme.colorScheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: enabled
+                  ? [
+                      BoxShadow(
+                        color: primary.withValues(alpha: 0.28),
+                        blurRadius: 14,
+                        offset: const Offset(0, 6),
+                      ),
+                    ]
+                  : null,
+            ),
+            child: Center(
+              child: Text(
+                'Accept & Continue',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: enabled
+                      ? theme.colorScheme.onPrimary
+                      : AppTheme.mutedOf(context),
+                  fontWeight: FontWeight.w700,
                 ),
-              )
-          : null,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 220),
-        height: 50,
-        decoration: BoxDecoration(
-          color: enabled ? _blue : const Color(0xFFE0E0E0),
-          borderRadius: BorderRadius.circular(12),
-        ),
-        child: Center(
-          child: Text(
-            'Accept & Continue',
-            style: TextStyle(
-              color: enabled ? Colors.white : const Color(0xFFAAAAAA),
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.2,
+              ),
             ),
           ),
         ),
