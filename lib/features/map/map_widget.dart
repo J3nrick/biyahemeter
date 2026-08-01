@@ -5,6 +5,7 @@ import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:biyahe_meter/core/theme/theme_provider.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
+import 'package:biyahe_meter/features/meter/widgets/premium_buttons.dart';
 
 class MapWidget extends StatefulWidget {
   const MapWidget({super.key});
@@ -244,96 +245,69 @@ class _MapWidgetState extends State<MapWidget>
         Positioned(
           right: 12,
           top: topInset + 12,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _mapBtn(
-                context: context,
-                icon: Icons.add_rounded,
-                semanticLabel: 'Zoom in',
-                onTap: () => _mapController.move(
-                  _mapController.camera.center,
-                  (_mapController.camera.zoom + 1).clamp(1.0, 19.0),
+          child: SafeArea(
+            left: false,
+            bottom: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(18),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.12),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    children: [
+                      PremiumIconButton(
+                        tooltip: 'Zoom in',
+                        icon: Icons.add_rounded,
+                        onPressed: () => _mapController.move(
+                          _mapController.camera.center,
+                          (_mapController.camera.zoom + 1).clamp(1.0, 19.0),
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      PremiumIconButton(
+                        tooltip: 'Zoom out',
+                        icon: Icons.remove_rounded,
+                        onPressed: () => _mapController.move(
+                          _mapController.camera.center,
+                          (_mapController.camera.zoom - 1).clamp(1.0, 19.0),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 8),
-              _mapBtn(
-                context: context,
-                icon: Icons.remove_rounded,
-                semanticLabel: 'Zoom out',
-                onTap: () => _mapController.move(
-                  _mapController.camera.center,
-                  (_mapController.camera.zoom - 1).clamp(1.0, 19.0),
+                const SizedBox(height: 10),
+                PremiumIconButton(
+                  tooltip: _isFollowing
+                      ? 'Following your location'
+                      : 'Recenter on my location',
+                  icon: _isFollowing
+                      ? Icons.my_location_rounded
+                      : Icons.location_searching_rounded,
+                  active: _isFollowing,
+                  onPressed: _recenter,
                 ),
-              ),
-              const SizedBox(height: 10),
-              _mapBtn(
-                context: context,
-                icon: _isFollowing
-                    ? Icons.my_location_rounded
-                    : Icons.location_searching_rounded,
-                semanticLabel: 'Recenter map',
-                accent: _isFollowing,
-                onTap: _recenter,
-              ),
-              const SizedBox(height: 10),
-              _mapBtn(
-                context: context,
-                icon: Icons.refresh_rounded,
-                semanticLabel: 'Reset trip',
-                onTap: () => context.read<MeterProvider>().resetTrip(),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _mapBtn({
-    required BuildContext context,
-    required IconData icon,
-    required VoidCallback onTap,
-    required String semanticLabel,
-    bool accent = false,
-  }) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    return Semantics(
-      button: true,
-      label: semanticLabel,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Ink(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withValues(alpha: isDark ? 0.88 : 0.94),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: theme.colorScheme.outline.withValues(alpha: 0.7),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.1),
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
+                const SizedBox(height: 10),
+                PremiumIconButton(
+                  tooltip: 'Reset trip totals',
+                  icon: Icons.refresh_rounded,
+                  danger: true,
+                  haptic: AppHaptic.medium,
+                  onPressed: () => context.read<MeterProvider>().resetTrip(),
                 ),
               ],
             ),
-            child: Icon(
-              icon,
-              size: 20,
-              color: accent
-                  ? theme.colorScheme.primary
-                  : theme.colorScheme.onSurface,
-            ),
           ),
         ),
-      ),
+      ],
     );
   }
 }

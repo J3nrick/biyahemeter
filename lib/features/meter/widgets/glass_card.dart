@@ -91,6 +91,7 @@ class MetricCard extends StatelessWidget {
     return Semantics(
       label: '$label $value $unit',
       child: Container(
+        constraints: const BoxConstraints(minHeight: 112),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         decoration: BoxDecoration(
           color: theme.colorScheme.surface,
@@ -102,7 +103,6 @@ class MetricCard extends StatelessWidget {
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             Row(
               children: [
@@ -126,7 +126,7 @@ class MetricCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 12),
             FittedBox(
               fit: BoxFit.scaleDown,
               alignment: Alignment.centerLeft,

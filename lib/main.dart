@@ -39,24 +39,26 @@ class BiyaheMeterApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
           final isDark = themeProvider.isDarkMode;
-          SystemChrome.setSystemUIOverlayStyle(
-            SystemUiOverlayStyle(
-              statusBarColor: Colors.transparent,
-              statusBarIconBrightness:
-                  isDark ? Brightness.light : Brightness.dark,
-              systemNavigationBarColor:
-                  isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
-              systemNavigationBarIconBrightness:
-                  isDark ? Brightness.light : Brightness.dark,
-            ),
+          final overlay = SystemUiOverlayStyle(
+            statusBarColor: Colors.transparent,
+            statusBarIconBrightness:
+                isDark ? Brightness.light : Brightness.dark,
+            systemNavigationBarColor:
+                isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
+            systemNavigationBarIconBrightness:
+                isDark ? Brightness.light : Brightness.dark,
           );
-          return MaterialApp(
-            title: 'BiyaheMeter PH',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
-            home: const _SplashGate(child: AgreementsScreen()),
+
+          return AnnotatedRegion<SystemUiOverlayStyle>(
+            value: overlay,
+            child: MaterialApp(
+              title: 'BiyaheMeter PH',
+              debugShowCheckedModeBanner: false,
+              theme: AppTheme.lightTheme,
+              darkTheme: AppTheme.darkTheme,
+              themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              home: const _SplashGate(child: AgreementsScreen()),
+            ),
           );
         },
       ),
@@ -87,13 +89,19 @@ class _SplashGateState extends State<_SplashGate> {
       final minDelay = Future.delayed(const Duration(milliseconds: 1500));
       // permission_handler is not supported on web — skip it to prevent
       // an UnimplementedError that would keep the splash pinned forever.
-      if (!kIsWeb) {
+      try {
+        if (!kIsWeb) {
+          try {
+            await Permission.locationWhenInUse.request();
+          } catch (_) {}
+        }
+        await minDelay;
+      } finally {
+        // Always dismiss splash — even if permission/delay path throws.
         try {
-          await Permission.locationWhenInUse.request();
+          FlutterNativeSplash.remove();
         } catch (_) {}
       }
-      await minDelay;
-      FlutterNativeSplash.remove();
     });
   }
 

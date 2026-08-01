@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,7 @@ import 'package:biyahe_meter/core/theme/theme_provider.dart';
 import 'package:biyahe_meter/features/map/map_widget.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/meter/widgets/glass_card.dart';
+import 'package:biyahe_meter/features/meter/widgets/premium_buttons.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -38,6 +40,8 @@ class _HomeScreenState extends State<HomeScreen> {
   static const double _snapMid = 0.60;
   static const double _snapMax = 0.90;
 
+  double _sheetExtent = _snapPeek;
+
   @override
   void initState() {
     super.initState();
@@ -60,6 +64,18 @@ class _HomeScreenState extends State<HomeScreen> {
     _gasFocus.dispose();
     _baseFareFocus.dispose();
     super.dispose();
+  }
+
+  void _syncControllersFromMeter(MeterProvider meter) {
+    if (!_editingKm) {
+      _kmController.text = meter.kmPerLiter.toStringAsFixed(1);
+    }
+    if (!_editingGas) {
+      _gasController.text = meter.gasPricePerLiter.toStringAsFixed(2);
+    }
+    if (!_editingBase) {
+      _baseFareController.text = meter.baseFare.toStringAsFixed(2);
+    }
   }
 
   void _saveKm(MeterProvider meter) {
@@ -86,43 +102,44 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _expandSheet([double size = _snapMid]) async {
     if (!_sheetController.isAttached) return;
     await _sheetController.animateTo(
-      size,
+      size.clamp(_snapMin, _snapMax),
       duration: const Duration(milliseconds: 320),
       curve: Curves.easeOutCubic,
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final meter = context.watch<MeterProvider>();
-    final themeProvider = context.watch<ThemeProvider>();
-    final mq = MediaQuery.of(context);
-    final isNarrow = mq.size.width <= 393;
-    final isWide = mq.size.width >= 700;
+  void _onPrimaryAction(MeterProvider meter) {
+    _expandSheet(_snapPeek);
+    if (meter.isRunning) {
+      meter.stopTrip();
+      return;
+    }
+    if (meter.canResumeTrip) {
+      meter.resumeTrip();
+    } else {
+      meter.startTrip();
+    }
+  }
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      resizeToAvoidBottomInset: false,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          const MapWidget(),
-          _TopStatusBar(meter: meter, themeProvider: themeProvider),
-          DraggableScrollableSheet(
-            controller: _sheetController,
-            initialChildSize: _snapPeek,
-            minChildSize: _snapMin,
-            maxChildSize: _snapMax,
-            snap: true,
-            // Intermediate snaps only — min/max are snap points when snap: true.
-            snapSizes: const [_snapPeek, _snapMid],
-            builder: (context, scrollController) {
-              return _DashboardSheet(
-                scrollController: scrollController,
+  Future<void> _openSettingsSheet(MeterProvider meter) async {
+    _syncControllersFromMeter(meter);
+    await _expandSheet(_snapPeek);
+    if (!mounted) return;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        return Padding(
+          padding: EdgeInsets.only(
+            bottom: MediaQuery.viewInsetsOf(sheetContext).bottom,
+          ),
+          child: StatefulBuilder(
+            builder: (context, setModalState) {
+              return _SettingsBottomSheet(
                 meter: meter,
-                themeProvider: themeProvider,
-                isNarrow: isNarrow,
-                isWide: isWide,
                 kmController: _kmController,
                 gasController: _gasController,
                 baseFareController: _baseFareController,
@@ -132,77 +149,142 @@ class _HomeScreenState extends State<HomeScreen> {
                 editingKm: _editingKm,
                 editingGas: _editingGas,
                 editingBase: _editingBase,
-                onExpand: _expandSheet,
                 onEditKm: () {
                   if (_editingGas) _saveGas(meter);
                   if (_editingBase) _saveBase(meter);
                   setState(() => _editingKm = true);
-                  _expandSheet(_snapMax);
+                  setModalState(() {});
                   Future.delayed(
-                      const Duration(milliseconds: 50), _kmFocus.requestFocus);
+                    const Duration(milliseconds: 50),
+                    _kmFocus.requestFocus,
+                  );
                 },
                 onEditGas: () {
                   if (_editingKm) _saveKm(meter);
                   if (_editingBase) _saveBase(meter);
                   setState(() => _editingGas = true);
-                  _expandSheet(_snapMax);
+                  setModalState(() {});
                   Future.delayed(
-                      const Duration(milliseconds: 50), _gasFocus.requestFocus);
+                    const Duration(milliseconds: 50),
+                    _gasFocus.requestFocus,
+                  );
                 },
                 onEditBase: () {
                   if (_editingKm) _saveKm(meter);
                   if (_editingGas) _saveGas(meter);
                   setState(() => _editingBase = true);
-                  _expandSheet(_snapMax);
-                  Future.delayed(const Duration(milliseconds: 50),
-                      _baseFareFocus.requestFocus);
+                  setModalState(() {});
+                  Future.delayed(
+                    const Duration(milliseconds: 50),
+                    _baseFareFocus.requestFocus,
+                  );
                 },
-                onSaveKm: () => _saveKm(meter),
-                onSaveGas: () => _saveGas(meter),
-                onSaveBase: () => _saveBase(meter),
-                onPrimaryAction: () {
-                  _expandSheet(_snapPeek);
-                  if (meter.isRunning) {
-                    meter.stopTrip();
-                    return;
-                  }
-                  if (meter.canResumeTrip) {
-                    meter.resumeTrip();
-                  } else {
-                    meter.startTrip();
-                  }
+                onSaveKm: () {
+                  _saveKm(meter);
+                  setModalState(() {});
+                },
+                onSaveGas: () {
+                  _saveGas(meter);
+                  setModalState(() {});
+                },
+                onSaveBase: () {
+                  _saveBase(meter);
+                  setModalState(() {});
                 },
               );
             },
           ),
-        ],
+        );
+      },
+    );
+
+    if (_editingKm) _saveKm(meter);
+    if (_editingGas) _saveGas(meter);
+    if (_editingBase) _saveBase(meter);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final meter = context.watch<MeterProvider>();
+    final themeProvider = context.watch<ThemeProvider>();
+    final mq = MediaQuery.of(context);
+    final isNarrow = mq.size.width <= 393;
+    final isWide = mq.size.width >= 700;
+    final isCompactSheet = _sheetExtent < 0.42;
+    final textScaler = mq.textScaler.clamp(
+      minScaleFactor: 0.85,
+      maxScaleFactor: 1.25,
+    );
+
+    return MediaQuery(
+      data: mq.copyWith(textScaler: textScaler),
+      child: Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        resizeToAvoidBottomInset: false,
+        body: Stack(
+          fit: StackFit.expand,
+          children: [
+            const MapWidget(),
+            _TopStatusBar(meter: meter),
+            NotificationListener<DraggableScrollableNotification>(
+              onNotification: (notification) {
+                final next = notification.extent;
+                if ((next - _sheetExtent).abs() > 0.01) {
+                  setState(() => _sheetExtent = next);
+                }
+                return false;
+              },
+              child: DraggableScrollableSheet(
+                controller: _sheetController,
+                initialChildSize: _snapPeek,
+                minChildSize: _snapMin,
+                maxChildSize: _snapMax,
+                snap: true,
+                shouldCloseOnMinExtent: false,
+                snapSizes: const [_snapPeek, _snapMid],
+                builder: (context, scrollController) {
+                  return _DashboardSheet(
+                    scrollController: scrollController,
+                    meter: meter,
+                    themeProvider: themeProvider,
+                    isNarrow: isNarrow,
+                    isWide: isWide,
+                    isCompact: isCompactSheet,
+                    onExpand: _expandSheet,
+                    onOpenSettings: () => _openSettingsSheet(meter),
+                    onPrimaryAction: () => _onPrimaryAction(meter),
+                  );
+                },
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-// ── Floating top status strip (map stays visible) ───────────────
+// ── Floating top status strip ───────────────────────────────────
 
 class _TopStatusBar extends StatelessWidget {
   final MeterProvider meter;
-  final ThemeProvider themeProvider;
 
-  const _TopStatusBar({
-    required this.meter,
-    required this.themeProvider,
-  });
+  const _TopStatusBar({required this.meter});
 
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
+    final width = MediaQuery.sizeOf(context).width;
     final success = AppTheme.successOf(context);
     final warning = AppTheme.warningOf(context);
     final danger = AppTheme.dangerOf(context);
     final muted = AppTheme.mutedOf(context);
+    final primary = Theme.of(context).colorScheme.primary;
 
     final gpsLive = meter.lastUpdateTime != null &&
         DateTime.now().difference(meter.lastUpdateTime!).inSeconds < 30;
-    final hasFix = meter.currentPosition != null || meter.lastUpdateTime != null;
+    final hasFix = meter.currentPosition != null;
+    final hasSignal = meter.lastUpdateTime != null;
 
     String tripLabel;
     Color tripColor;
@@ -217,16 +299,18 @@ class _TopStatusBar extends StatelessWidget {
       tripColor = muted;
     }
 
+    final mapControlsReserve = width < 380 ? 64.0 : 72.0;
+
     return Positioned(
-      top: top + 10,
-      left: 14,
-      right: 72,
+      top: top + 8,
+      left: 12,
+      right: mapControlsReserve,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(18),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
             decoration: BoxDecoration(
               color: Theme.of(context)
                   .colorScheme
@@ -239,22 +323,46 @@ class _TopStatusBar extends StatelessWidget {
               boxShadow: AppTheme.softShadow(context),
             ),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Flexible(
-                  child: StatusChip(
-                    icon: CupertinoIcons.circle_fill,
-                    label: tripLabel,
-                    color: tripColor,
-                    active: meter.isRunning || meter.canResumeTrip,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: StatusChip(
-                    icon: CupertinoIcons.location_solid,
-                    label: gpsLive ? 'GPS Live' : (hasFix ? 'GPS' : 'No GPS'),
-                    color: gpsLive ? success : (hasFix ? warning : danger),
-                    active: hasFix,
+                Expanded(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      StatusChip(
+                        icon: CupertinoIcons.circle_fill,
+                        label: tripLabel,
+                        color: tripColor,
+                        active: meter.isRunning || meter.canResumeTrip,
+                      ),
+                      StatusChip(
+                        icon: CupertinoIcons.location_solid,
+                        label: hasFix
+                            ? (gpsLive ? 'GPS Live' : 'GPS')
+                            : 'No GPS',
+                        color: gpsLive
+                            ? success
+                            : (hasFix ? warning : danger),
+                        active: hasFix,
+                      ),
+                      StatusChip(
+                        icon: CupertinoIcons.map_pin_ellipse,
+                        label: hasFix ? 'Located' : 'Locating',
+                        color: hasFix ? primary : muted,
+                        active: hasFix,
+                      ),
+                      StatusChip(
+                        icon: CupertinoIcons.wifi,
+                        label: hasSignal
+                            ? (gpsLive ? 'Signal' : 'Weak')
+                            : 'Offline',
+                        color: gpsLive
+                            ? success
+                            : (hasSignal ? warning : muted),
+                        active: hasSignal,
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(width: 8),
@@ -326,22 +434,9 @@ class _DashboardSheet extends StatelessWidget {
   final ThemeProvider themeProvider;
   final bool isNarrow;
   final bool isWide;
-  final TextEditingController kmController;
-  final TextEditingController gasController;
-  final TextEditingController baseFareController;
-  final FocusNode kmFocus;
-  final FocusNode gasFocus;
-  final FocusNode baseFareFocus;
-  final bool editingKm;
-  final bool editingGas;
-  final bool editingBase;
+  final bool isCompact;
   final Future<void> Function([double size]) onExpand;
-  final VoidCallback onEditKm;
-  final VoidCallback onEditGas;
-  final VoidCallback onEditBase;
-  final VoidCallback onSaveKm;
-  final VoidCallback onSaveGas;
-  final VoidCallback onSaveBase;
+  final VoidCallback onOpenSettings;
   final VoidCallback onPrimaryAction;
 
   const _DashboardSheet({
@@ -350,22 +445,9 @@ class _DashboardSheet extends StatelessWidget {
     required this.themeProvider,
     required this.isNarrow,
     required this.isWide,
-    required this.kmController,
-    required this.gasController,
-    required this.baseFareController,
-    required this.kmFocus,
-    required this.gasFocus,
-    required this.baseFareFocus,
-    required this.editingKm,
-    required this.editingGas,
-    required this.editingBase,
+    required this.isCompact,
     required this.onExpand,
-    required this.onEditKm,
-    required this.onEditGas,
-    required this.onEditBase,
-    required this.onSaveKm,
-    required this.onSaveGas,
-    required this.onSaveBase,
+    required this.onOpenSettings,
     required this.onPrimaryAction,
   });
 
@@ -374,15 +456,17 @@ class _DashboardSheet extends StatelessWidget {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
     final bottomPad = MediaQuery.paddingOf(context).bottom;
+    final keyboard = MediaQuery.viewInsetsOf(context).bottom;
 
     return RepaintBoundary(
       child: ClipRRect(
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
           child: DecoratedBox(
             decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withValues(alpha: isDark ? 0.88 : 0.92),
+              color: theme.colorScheme.surface
+                  .withValues(alpha: isDark ? 0.88 : 0.94),
               borderRadius:
                   const BorderRadius.vertical(top: Radius.circular(28)),
               border: Border.all(
@@ -391,67 +475,82 @@ class _DashboardSheet extends StatelessWidget {
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.14),
-                  blurRadius: 28,
+                  blurRadius: 24,
                   offset: const Offset(0, -6),
                 ),
               ],
             ),
             child: ListView(
               controller: scrollController,
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
               padding: EdgeInsets.fromLTRB(
                 isWide ? 28 : 16,
                 8,
                 isWide ? 28 : 16,
-                bottomPad + 20,
+                bottomPad + keyboard + 20,
               ),
               children: [
                 Center(
-                  child: Container(
-                    width: 42,
-                    height: 5,
-                    margin: const EdgeInsets.only(bottom: 12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.mutedOf(context).withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(99),
+                  child: Semantics(
+                    label: 'Drag dashboard',
+                    child: Container(
+                      width: 42,
+                      height: 5,
+                      margin: const EdgeInsets.only(bottom: 10),
+                      decoration: BoxDecoration(
+                        color:
+                            AppTheme.mutedOf(context).withValues(alpha: 0.45),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
                     ),
                   ),
                 ),
                 _HeaderRow(
                   themeProvider: themeProvider,
-                  onSettings: () => onExpand(0.90),
+                  onSettings: onOpenSettings,
+                  onExpand: () => onExpand(0.60),
                 ),
-                const SizedBox(height: 14),
-                _FareHeroCard(meter: meter, compact: isNarrow),
                 const SizedBox(height: 12),
-                _TripStatusBanner(meter: meter),
-                const SizedBox(height: 12),
-                _MetricsGrid(meter: meter),
-                const SizedBox(height: 14),
-                _SettingsSection(
-                  meter: meter,
-                  compact: isNarrow,
-                  kmController: kmController,
-                  gasController: gasController,
-                  baseFareController: baseFareController,
-                  kmFocus: kmFocus,
-                  gasFocus: gasFocus,
-                  baseFareFocus: baseFareFocus,
-                  editingKm: editingKm,
-                  editingGas: editingGas,
-                  editingBase: editingBase,
-                  onEditKm: onEditKm,
-                  onEditGas: onEditGas,
-                  onEditBase: onEditBase,
-                  onSaveKm: onSaveKm,
-                  onSaveGas: onSaveGas,
-                  onSaveBase: onSaveBase,
-                ),
-                const SizedBox(height: 16),
-                _PrimaryTripButton(
-                  meter: meter,
-                  compact: isNarrow,
-                  onTap: onPrimaryAction,
-                ),
+                _FareHeroCard(meter: meter, compact: isNarrow || isCompact),
+                if (isCompact) ...[
+                  const SizedBox(height: 12),
+                  _CompactMetricsRow(meter: meter),
+                  const SizedBox(height: 12),
+                  TripActionButton(
+                    kind: _tripActionKind(meter),
+                    compact: true,
+                    onPressed: onPrimaryAction,
+                  ),
+                  const SizedBox(height: 8),
+                  Center(
+                    child: Text(
+                      'Pull up for full trip controls',
+                      style: theme.textTheme.labelSmall?.copyWith(
+                        color: AppTheme.mutedOf(context),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  const SizedBox(height: 12),
+                  _TripStatusBanner(meter: meter),
+                  const SizedBox(height: 12),
+                  _MetricsGrid(meter: meter),
+                  const SizedBox(height: 16),
+                  TripActionButton(
+                    kind: _tripActionKind(meter),
+                    compact: isNarrow,
+                    onPressed: onPrimaryAction,
+                  ),
+                  const SizedBox(height: 12),
+                  PremiumSurfaceButton(
+                    icon: CupertinoIcons.slider_horizontal_3,
+                    title: 'Trip settings',
+                    subtitle: 'Fuel efficiency, gas price, base fare',
+                    onPressed: onOpenSettings,
+                  ),
+                ],
               ],
             ),
           ),
@@ -464,10 +563,12 @@ class _DashboardSheet extends StatelessWidget {
 class _HeaderRow extends StatelessWidget {
   final ThemeProvider themeProvider;
   final VoidCallback onSettings;
+  final VoidCallback onExpand;
 
   const _HeaderRow({
     required this.themeProvider,
     required this.onSettings,
+    required this.onExpand,
   });
 
   @override
@@ -478,88 +579,58 @@ class _HeaderRow extends StatelessWidget {
     return Row(
       children: [
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'BiyaheMeter',
-                style: theme.textTheme.titleLarge?.copyWith(
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: -0.4,
+          child: GestureDetector(
+            onTap: onExpand,
+            behavior: HitTestBehavior.opaque,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'BiyaheMeter',
+                  style: theme.textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.4,
+                  ),
                 ),
-              ),
-              Text(
-                'Premium trip control',
-                style: theme.textTheme.bodySmall?.copyWith(color: muted),
-              ),
-            ],
+                Text(
+                  'Premium trip control',
+                  style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                ),
+              ],
+            ),
           ),
         ),
-        _IconAction(
-          semanticLabel: 'Open settings',
+        PremiumIconButton(
+          tooltip: 'Trip settings',
           icon: CupertinoIcons.slider_horizontal_3,
-          onTap: onSettings,
+          onPressed: onSettings,
         ),
         const SizedBox(width: 8),
-        _IconAction(
-          semanticLabel: 'Toggle theme',
+        PremiumIconButton(
+          tooltip: themeProvider.isDarkMode
+              ? 'Switch to light mode'
+              : 'Switch to dark mode',
           icon: themeProvider.isDarkMode
               ? CupertinoIcons.sun_max_fill
               : CupertinoIcons.moon_fill,
           iconColor: themeProvider.isDarkMode
               ? AppTheme.darkWarning
               : theme.colorScheme.primary,
-          onTap: themeProvider.toggleTheme,
+          accent: themeProvider.isDarkMode
+              ? AppTheme.darkWarning
+              : theme.colorScheme.primary,
+          active: true,
+          onPressed: themeProvider.toggleTheme,
         ),
       ],
     );
   }
 }
 
-class _IconAction extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final String semanticLabel;
-  final Color? iconColor;
-
-  const _IconAction({
-    required this.icon,
-    required this.onTap,
-    required this.semanticLabel,
-    this.iconColor,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: semanticLabel,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(14),
-          child: Ink(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerHighest
-                  .withValues(alpha: 0.55),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: AppTheme.borderOf(context).withValues(alpha: 0.8),
-              ),
-            ),
-            child: Icon(
-              icon,
-              size: 20,
-              color: iconColor ?? Theme.of(context).colorScheme.onSurface,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
+TripActionKind _tripActionKind(MeterProvider meter) {
+  if (meter.isRunning) return TripActionKind.stop;
+  if (meter.canResumeTrip) return TripActionKind.resume;
+  return TripActionKind.start;
 }
 
 class _FareHeroCard extends StatelessWidget {
@@ -593,7 +664,12 @@ class _FareHeroCard extends StatelessWidget {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
-        padding: EdgeInsets.fromLTRB(18, compact ? 14 : 18, 18, compact ? 14 : 18),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          compact ? 12 : 16,
+          16,
+          compact ? 12 : 16,
+        ),
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.topLeft,
@@ -644,13 +720,13 @@ class _FareHeroCard extends StatelessWidget {
                         key: ValueKey(meter.totalFare.toStringAsFixed(2)),
                         style: AppTheme.fareStyle(
                           brightness: Brightness.dark,
-                          fontSize: compact ? 34 : 40,
+                          fontSize: compact ? 30 : 40,
                           color: Colors.white,
                         ),
                       ),
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 6),
                   Text(
                     updateText,
                     style: theme.textTheme.labelSmall?.copyWith(
@@ -661,26 +737,28 @@ class _FareHeroCard extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                _FareDetail(
-                  label: 'Base',
-                  value: '₱${meter.baseFare.toStringAsFixed(0)}',
-                ),
-                const SizedBox(height: 8),
-                _FareDetail(
-                  label: 'Rate',
-                  value: '₱${rate.toStringAsFixed(2)}/km',
-                ),
-                const SizedBox(height: 8),
-                _FareDetail(
-                  label: 'Dist.',
-                  value: '${meter.distanceKm.toStringAsFixed(2)} km',
-                ),
-              ],
-            ),
+            if (!compact) ...[
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  _FareDetail(
+                    label: 'Base',
+                    value: '₱${meter.baseFare.toStringAsFixed(0)}',
+                  ),
+                  const SizedBox(height: 8),
+                  _FareDetail(
+                    label: 'Rate',
+                    value: '₱${rate.toStringAsFixed(2)}/km',
+                  ),
+                  const SizedBox(height: 8),
+                  _FareDetail(
+                    label: 'Dist.',
+                    value: '${meter.distanceKm.toStringAsFixed(2)} km',
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -752,7 +830,8 @@ class _TripStatusBanner extends StatelessWidget {
       icon = CupertinoIcons.car_detailed;
     }
 
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.10),
@@ -787,6 +866,57 @@ class _TripStatusBanner extends StatelessWidget {
   }
 }
 
+class _CompactMetricsRow extends StatelessWidget {
+  final MeterProvider meter;
+
+  const _CompactMetricsRow({required this.meter});
+
+  @override
+  Widget build(BuildContext context) {
+    final muted = AppTheme.mutedOf(context);
+    final theme = Theme.of(context);
+
+    Widget chip(String label, String value) {
+      return Expanded(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppTheme.borderOf(context)),
+          ),
+          child: Column(
+            children: [
+              Text(
+                value,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              Text(
+                label,
+                style: theme.textTheme.labelSmall?.copyWith(color: muted),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: [
+        chip('km', meter.distanceKm.toStringAsFixed(2)),
+        const SizedBox(width: 8),
+        chip('min', meter.waitingMinutes.toStringAsFixed(1)),
+        const SizedBox(width: 8),
+        chip('km/h', meter.currentSpeed.toStringAsFixed(0)),
+      ],
+    );
+  }
+}
+
 class _MetricsGrid extends StatelessWidget {
   final MeterProvider meter;
 
@@ -813,9 +943,9 @@ class _MetricsGrid extends StatelessWidget {
           ),
           MetricCard(
             icon: CupertinoIcons.clock_fill,
-            label: 'Waiting',
+            label: 'Time',
             value: meter.waitingMinutes.toStringAsFixed(1),
-            unit: 'minutes',
+            unit: 'waiting min',
             accent: warning,
           ),
           MetricCard(
@@ -827,7 +957,7 @@ class _MetricsGrid extends StatelessWidget {
           ),
           MetricCard(
             icon: FontAwesomeIcons.gasPump,
-            label: 'Fuel used',
+            label: 'Fuel',
             value: fuelUsed.toStringAsFixed(2),
             unit: 'liters est.',
             accent: warning,
@@ -835,41 +965,32 @@ class _MetricsGrid extends StatelessWidget {
         ];
 
         if (wide) {
-          return SizedBox(
-            height: 118,
-            child: Row(
-              children: [
-                for (var i = 0; i < cards.length; i++) ...[
-                  if (i > 0) const SizedBox(width: 10),
-                  Expanded(child: cards[i]),
-                ],
+          return Row(
+            children: [
+              for (var i = 0; i < cards.length; i++) ...[
+                if (i > 0) const SizedBox(width: 10),
+                Expanded(child: cards[i]),
               ],
-            ),
+            ],
           );
         }
 
         return Column(
           children: [
-            SizedBox(
-              height: 114,
-              child: Row(
-                children: [
-                  Expanded(child: cards[0]),
-                  const SizedBox(width: 10),
-                  Expanded(child: cards[1]),
-                ],
-              ),
+            Row(
+              children: [
+                Expanded(child: cards[0]),
+                const SizedBox(width: 10),
+                Expanded(child: cards[1]),
+              ],
             ),
             const SizedBox(height: 10),
-            SizedBox(
-              height: 114,
-              child: Row(
-                children: [
-                  Expanded(child: cards[2]),
-                  const SizedBox(width: 10),
-                  Expanded(child: cards[3]),
-                ],
-              ),
+            Row(
+              children: [
+                Expanded(child: cards[2]),
+                const SizedBox(width: 10),
+                Expanded(child: cards[3]),
+              ],
             ),
           ],
         );
@@ -878,9 +999,8 @@ class _MetricsGrid extends StatelessWidget {
   }
 }
 
-class _SettingsSection extends StatelessWidget {
+class _SettingsBottomSheet extends StatelessWidget {
   final MeterProvider meter;
-  final bool compact;
   final TextEditingController kmController;
   final TextEditingController gasController;
   final TextEditingController baseFareController;
@@ -897,9 +1017,8 @@ class _SettingsSection extends StatelessWidget {
   final VoidCallback onSaveGas;
   final VoidCallback onSaveBase;
 
-  const _SettingsSection({
+  const _SettingsBottomSheet({
     required this.meter,
-    required this.compact,
     required this.kmController,
     required this.gasController,
     required this.baseFareController,
@@ -921,73 +1040,197 @@ class _SettingsSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final muted = AppTheme.mutedOf(context);
+    final isNarrow = MediaQuery.sizeOf(context).width <= 393;
+    final themeProvider = context.watch<ThemeProvider>();
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          'Trip settings',
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w700,
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          constraints: BoxConstraints(
+            maxHeight: MediaQuery.sizeOf(context).height * 0.82,
           ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          'Fuel efficiency, gas price, and base fare',
-          style: theme.textTheme.bodySmall?.copyWith(color: muted),
-        ),
-        const SizedBox(height: 10),
-        Container(
           decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: AppTheme.borderOf(context).withValues(alpha: 0.9),
-            ),
-            boxShadow: AppTheme.softShadow(context),
+            color: theme.colorScheme.surface.withValues(alpha: 0.96),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            border: Border.all(color: AppTheme.borderOf(context)),
           ),
-          child: Column(
-            children: [
-              _SettingsTile(
-                icon: FontAwesomeIcons.gasPump,
-                label: 'Fuel efficiency',
-                hint: 'km per liter',
-                controller: kmController,
-                focusNode: kmFocus,
-                isEditing: editingKm,
-                compact: compact,
-                onTapEdit: onEditKm,
-                onSave: onSaveKm,
-              ),
-              Divider(height: 1, color: AppTheme.borderOf(context)),
-              _SettingsTile(
-                icon: FontAwesomeIcons.pesoSign,
-                label: 'Gas price',
-                hint: 'pesos per liter',
-                controller: gasController,
-                focusNode: gasFocus,
-                isEditing: editingGas,
-                compact: compact,
-                onTapEdit: onEditGas,
-                onSave: onSaveGas,
-              ),
-              Divider(height: 1, color: AppTheme.borderOf(context)),
-              _SettingsTile(
-                icon: FontAwesomeIcons.coins,
-                label: 'Base fare',
-                hint: 'starting amount',
-                controller: baseFareController,
-                focusNode: baseFareFocus,
-                isEditing: editingBase,
-                compact: compact,
-                onTapEdit: onEditBase,
-                onSave: onSaveBase,
-                isLast: true,
-              ),
-            ],
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 5,
+                    margin: const EdgeInsets.only(bottom: 14),
+                    decoration: BoxDecoration(
+                      color: muted.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(99),
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Settings',
+                            style: theme.textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          Text(
+                            'Grouped trip configuration',
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: muted),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      tooltip: 'Close settings',
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        Navigator.pop(context);
+                      },
+                      icon: const Icon(CupertinoIcons.xmark_circle_fill),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _SettingsGroup(
+                  title: 'Appearance',
+                  description: 'Adaptive light and dark theme',
+                  child: SwitchListTile.adaptive(
+                    contentPadding: EdgeInsets.zero,
+                    secondary: Icon(
+                      themeProvider.isDarkMode
+                          ? CupertinoIcons.moon_fill
+                          : CupertinoIcons.sun_max_fill,
+                      color: theme.colorScheme.primary,
+                    ),
+                    title: Text(
+                      'Dark mode',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      themeProvider.isDarkMode
+                          ? 'Dark dashboard active'
+                          : 'Light dashboard active',
+                      style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                    ),
+                    value: themeProvider.isDarkMode,
+                    onChanged: (_) => themeProvider.toggleTheme(),
+                  ),
+                ),
+                const SizedBox(height: 14),
+                _SettingsGroup(
+                  title: 'Fare inputs',
+                  description: 'Fuel efficiency, gas price, and base fare',
+                  child: Column(
+                    children: [
+                      _SettingsTile(
+                        icon: FontAwesomeIcons.gasPump,
+                        label: 'Fuel efficiency',
+                        hint: 'km per liter',
+                        controller: kmController,
+                        focusNode: kmFocus,
+                        isEditing: editingKm,
+                        compact: isNarrow,
+                        onTapEdit: onEditKm,
+                        onSave: onSaveKm,
+                      ),
+                      Divider(height: 1, color: AppTheme.borderOf(context)),
+                      _SettingsTile(
+                        icon: FontAwesomeIcons.pesoSign,
+                        label: 'Gas price',
+                        hint: 'pesos per liter',
+                        controller: gasController,
+                        focusNode: gasFocus,
+                        isEditing: editingGas,
+                        compact: isNarrow,
+                        onTapEdit: onEditGas,
+                        onSave: onSaveGas,
+                      ),
+                      Divider(height: 1, color: AppTheme.borderOf(context)),
+                      _SettingsTile(
+                        icon: FontAwesomeIcons.coins,
+                        label: 'Base fare',
+                        hint: 'starting amount',
+                        controller: baseFareController,
+                        focusNode: baseFareFocus,
+                        isEditing: editingBase,
+                        compact: isNarrow,
+                        onTapEdit: onEditBase,
+                        onSave: onSaveBase,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Rate ₱${(meter.kmPerLiter > 0 ? meter.gasPricePerLiter / meter.kmPerLiter : 0).toStringAsFixed(2)}/km · Current fare ₱${meter.totalFare.toStringAsFixed(2)}',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall?.copyWith(color: muted),
+                ),
+              ],
+            ),
           ),
         ),
-      ],
+      ),
+    );
+  }
+}
+
+class _SettingsGroup extends StatelessWidget {
+  final String title;
+  final String description;
+  final Widget child;
+
+  const _SettingsGroup({
+    required this.title,
+    required this.description,
+    required this.child,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = AppTheme.mutedOf(context);
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppTheme.borderOf(context)),
+        boxShadow: AppTheme.softShadow(context),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            title,
+            style: theme.textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            description,
+            style: theme.textTheme.bodySmall?.copyWith(color: muted),
+          ),
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
     );
   }
 }
@@ -1002,7 +1245,6 @@ class _SettingsTile extends StatelessWidget {
   final bool compact;
   final VoidCallback onTapEdit;
   final VoidCallback onSave;
-  final bool isLast;
 
   const _SettingsTile({
     required this.icon,
@@ -1014,7 +1256,6 @@ class _SettingsTile extends StatelessWidget {
     required this.compact,
     required this.onTapEdit,
     required this.onSave,
-    this.isLast = false,
   });
 
   @override
@@ -1028,14 +1269,9 @@ class _SettingsTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: isEditing ? null : onTapEdit,
-        borderRadius: BorderRadius.vertical(
-          top: label == 'Fuel efficiency' ? const Radius.circular(18) : Radius.zero,
-          bottom: isLast ? const Radius.circular(18) : Radius.zero,
-        ),
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? 12 : 16,
-            vertical: compact ? 12 : 14,
+            vertical: compact ? 10 : 12,
           ),
           child: Row(
             children: [
@@ -1096,105 +1332,33 @@ class _SettingsTile extends StatelessWidget {
                         ),
                       ),
               ),
-              const SizedBox(width: 8),
-              Semantics(
-                button: true,
-                label: isEditing ? 'Save $label' : 'Edit $label',
-                child: InkWell(
-                  onTap: isEditing ? onSave : onTapEdit,
-                  borderRadius: BorderRadius.circular(12),
-                  child: SizedBox(
-                    width: 44,
-                    height: 44,
-                    child: Icon(
-                      isEditing
-                          ? CupertinoIcons.checkmark_circle_fill
-                          : CupertinoIcons.pencil,
-                      size: 22,
-                      color: isEditing ? success : muted,
-                    ),
+              const SizedBox(width: 4),
+              Pressable(
+                onPressed: isEditing ? onSave : onTapEdit,
+                semanticLabel: isEditing ? 'Save $label' : 'Edit $label',
+                haptic: isEditing ? AppHaptic.medium : AppHaptic.selection,
+                pressedScale: 0.92,
+                borderRadius: BorderRadius.circular(12),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: isEditing
+                        ? success.withValues(alpha: 0.14)
+                        : primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    isEditing
+                        ? CupertinoIcons.checkmark_circle_fill
+                        : CupertinoIcons.pencil,
+                    size: 22,
+                    color: isEditing ? success : muted,
                   ),
                 ),
               ),
             ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _PrimaryTripButton extends StatelessWidget {
-  final MeterProvider meter;
-  final bool compact;
-  final VoidCallback onTap;
-
-  const _PrimaryTripButton({
-    required this.meter,
-    required this.compact,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final isRunning = meter.isRunning;
-    final isResume = meter.canResumeTrip;
-    final success = AppTheme.successOf(context);
-    final danger = AppTheme.dangerOf(context);
-
-    final label = isRunning
-        ? 'Stop Trip'
-        : (isResume ? 'Resume Trip' : 'Start Trip');
-    final icon = isRunning
-        ? CupertinoIcons.stop_fill
-        : CupertinoIcons.play_arrow_solid;
-
-    return Semantics(
-      button: true,
-      label: label,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(18),
-          child: Ink(
-            height: compact ? 52 : 56,
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isRunning
-                    ? [danger, danger.withValues(alpha: 0.85)]
-                    : [
-                        success,
-                        Color.lerp(success, Colors.black, 0.12)!,
-                      ],
-              ),
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: (isRunning ? danger : success)
-                      .withValues(alpha: 0.35),
-                  blurRadius: 16,
-                  offset: const Offset(0, 8),
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(icon, color: Colors.white, size: 18),
-                const SizedBox(width: 10),
-                Text(
-                  label,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        letterSpacing: -0.2,
-                      ),
-                ),
-              ],
-            ),
           ),
         ),
       ),

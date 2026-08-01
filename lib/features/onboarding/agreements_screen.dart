@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/features/meter/home_screen.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
+import 'package:biyahe_meter/features/meter/widgets/premium_buttons.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 
 class AgreementsScreen extends StatelessWidget {
@@ -139,7 +141,10 @@ class AgreementsScreen extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
         borderRadius: BorderRadius.vertical(
           top: title.startsWith('Terms')
               ? const Radius.circular(20)
@@ -153,20 +158,29 @@ class AgreementsScreen extends StatelessWidget {
             children: [
               AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
-                width: 24,
-                height: 24,
+                width: 26,
+                height: 26,
                 margin: const EdgeInsets.only(top: 1),
                 decoration: BoxDecoration(
                   color: value ? primary : theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(7),
+                  borderRadius: BorderRadius.circular(8),
                   border: Border.all(
                     color: value ? primary : AppTheme.borderOf(context),
                     width: 1.5,
                   ),
+                  boxShadow: value
+                      ? [
+                          BoxShadow(
+                            color: primary.withValues(alpha: 0.28),
+                            blurRadius: 8,
+                            offset: const Offset(0, 3),
+                          ),
+                        ]
+                      : null,
                 ),
                 child: value
                     ? Icon(Icons.check_rounded,
-                        color: theme.colorScheme.onPrimary, size: 15)
+                        color: theme.colorScheme.onPrimary, size: 16)
                     : const SizedBox.shrink(),
               ),
               const SizedBox(width: 14),
@@ -278,62 +292,24 @@ class AgreementsScreen extends StatelessWidget {
   }
 
   Widget _buildAcceptButton(BuildContext context, bool enabled) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-
-    return Semantics(
-      button: true,
+    return PremiumConfirmButton(
+      label: 'Accept & Continue',
       enabled: enabled,
-      label: 'Accept and continue',
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: enabled
-              ? () => Navigator.pushReplacement(
-                    context,
-                    PageRouteBuilder(
-                      pageBuilder: (context, animation, secondaryAnimation) =>
-                          const HomeScreen(),
-                      transitionsBuilder: (context, animation,
-                              secondaryAnimation, child) =>
+      hintWhenDisabled: 'Check all agreements to continue',
+      icon: Icons.arrow_forward_rounded,
+      onPressed: enabled
+          ? () => Navigator.pushReplacement(
+                context,
+                PageRouteBuilder(
+                  pageBuilder: (context, animation, secondaryAnimation) =>
+                      const HomeScreen(),
+                  transitionsBuilder:
+                      (context, animation, secondaryAnimation, child) =>
                           FadeTransition(opacity: animation, child: child),
-                      transitionDuration: const Duration(milliseconds: 350),
-                    ),
-                  )
-              : null,
-          borderRadius: BorderRadius.circular(16),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 220),
-            height: 54,
-            decoration: BoxDecoration(
-              color: enabled
-                  ? primary
-                  : theme.colorScheme.surfaceContainerHighest,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: enabled
-                  ? [
-                      BoxShadow(
-                        color: primary.withValues(alpha: 0.28),
-                        blurRadius: 14,
-                        offset: const Offset(0, 6),
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Center(
-              child: Text(
-                'Accept & Continue',
-                style: theme.textTheme.titleMedium?.copyWith(
-                  color: enabled
-                      ? theme.colorScheme.onPrimary
-                      : AppTheme.mutedOf(context),
-                  fontWeight: FontWeight.w700,
+                  transitionDuration: const Duration(milliseconds: 350),
                 ),
-              ),
-            ),
-          ),
-        ),
-      ),
+              )
+          : null,
     );
   }
 }
