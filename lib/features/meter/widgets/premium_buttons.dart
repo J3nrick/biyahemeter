@@ -114,9 +114,7 @@ class TripActionButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final success = AppTheme.successOf(context);
-    final warning = AppTheme.warningOf(context);
-    final danger = AppTheme.dangerOf(context);
+    final primary = theme.colorScheme.primary;
 
     late final Color accent;
     late final String title;
@@ -126,26 +124,26 @@ class TripActionButton extends StatelessWidget {
 
     switch (kind) {
       case TripActionKind.start:
-        accent = success;
+        accent = primary;
         title = 'Start Trip';
         subtitle = 'Begin live GPS metering';
         icon = Icons.play_arrow_rounded;
         haptic = AppHaptic.medium;
       case TripActionKind.resume:
-        accent = warning;
+        accent = primary;
         title = 'Resume Trip';
         subtitle = 'Continue from current totals';
         icon = Icons.play_circle_fill_rounded;
         haptic = AppHaptic.medium;
       case TripActionKind.stop:
-        accent = danger;
+        accent = AppTheme.dangerOf(context);
         title = 'Stop Trip';
         subtitle = 'Pause tracking & keep totals';
         icon = Icons.stop_rounded;
         haptic = AppHaptic.heavy;
     }
 
-    final depth = Color.lerp(accent, Colors.black, 0.18)!;
+    final depth = Color.lerp(accent, Colors.black, 0.22)!;
 
     return Pressable(
       onPressed: onPressed,
@@ -170,14 +168,9 @@ class TripActionButton extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: accent.withValues(alpha: 0.38),
-              blurRadius: 18,
-              offset: const Offset(0, 8),
-            ),
-            BoxShadow(
-              color: Colors.black.withValues(alpha: 0.12),
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              color: accent.withValues(alpha: 0.28),
+              blurRadius: 14,
+              offset: const Offset(0, 6),
             ),
           ],
         ),

@@ -4,6 +4,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 import 'package:biyahe_meter/core/theme/theme_provider.dart';
+import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/meter/widgets/premium_buttons.dart';
 
@@ -301,7 +302,7 @@ class _MapWidgetState extends State<MapWidget>
                   icon: Icons.refresh_rounded,
                   danger: true,
                   haptic: AppHaptic.medium,
-                  onPressed: () => context.read<MeterProvider>().resetTrip(),
+                  onPressed: () => _confirmResetTrip(context),
                 ),
               ],
             ),
@@ -309,5 +310,106 @@ class _MapWidgetState extends State<MapWidget>
         ),
       ],
     );
+  }
+
+  Future<void> _confirmResetTrip(BuildContext context) async {
+    final confirmed = await showModalBottomSheet<bool>(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) {
+        final theme = Theme.of(sheetContext);
+        final muted = AppTheme.mutedOf(sheetContext);
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(20, 14, 20, 18),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface,
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: AppTheme.borderOf(sheetContext)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 40,
+                      height: 4,
+                      margin: const EdgeInsets.only(bottom: 14),
+                      decoration: BoxDecoration(
+                        color: muted.withValues(alpha: 0.4),
+                        borderRadius: BorderRadius.circular(99),
+                      ),
+                    ),
+                  ),
+                  Text(
+                    'Reset trip?',
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'This clears fare, distance, waiting time, and the route path.',
+                    style: theme.textTheme.bodyMedium?.copyWith(color: muted),
+                  ),
+                  const SizedBox(height: 18),
+                  Pressable(
+                    onPressed: () => Navigator.pop(sheetContext, true),
+                    semanticLabel: 'Confirm reset trip',
+                    haptic: AppHaptic.heavy,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      height: 52,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppTheme.dangerOf(sheetContext),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        'Reset trip',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Pressable(
+                    onPressed: () => Navigator.pop(sheetContext, false),
+                    semanticLabel: 'Cancel reset',
+                    haptic: AppHaptic.selection,
+                    borderRadius: BorderRadius.circular(16),
+                    child: Container(
+                      height: 48,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppTheme.borderOf(sheetContext),
+                        ),
+                      ),
+                      child: Text(
+                        'Cancel',
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+
+    if (confirmed == true && context.mounted) {
+      context.read<MeterProvider>().resetTrip();
+    }
   }
 }

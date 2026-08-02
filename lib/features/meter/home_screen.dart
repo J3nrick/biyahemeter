@@ -275,25 +275,22 @@ class _TopStatusBar extends StatelessWidget {
   Widget build(BuildContext context) {
     final top = MediaQuery.paddingOf(context).top;
     final width = MediaQuery.sizeOf(context).width;
-    final success = AppTheme.successOf(context);
-    final warning = AppTheme.warningOf(context);
-    final danger = AppTheme.dangerOf(context);
     final muted = AppTheme.mutedOf(context);
     final primary = Theme.of(context).colorScheme.primary;
+    final danger = AppTheme.dangerOf(context);
 
     final gpsLive = meter.lastUpdateTime != null &&
         DateTime.now().difference(meter.lastUpdateTime!).inSeconds < 30;
     final hasFix = meter.currentPosition != null;
-    final hasSignal = meter.lastUpdateTime != null;
 
     String tripLabel;
     Color tripColor;
     if (meter.isRunning) {
       tripLabel = 'Live';
-      tripColor = success;
+      tripColor = primary;
     } else if (meter.canResumeTrip) {
       tripLabel = 'Paused';
-      tripColor = warning;
+      tripColor = muted;
     } else {
       tripLabel = 'Idle';
       tripColor = muted;
@@ -334,33 +331,15 @@ class _TopStatusBar extends StatelessWidget {
                         icon: CupertinoIcons.circle_fill,
                         label: tripLabel,
                         color: tripColor,
-                        active: meter.isRunning || meter.canResumeTrip,
+                        active: meter.isRunning,
                       ),
                       StatusChip(
                         icon: CupertinoIcons.location_solid,
                         label: hasFix
-                            ? (gpsLive ? 'GPS Live' : 'GPS')
+                            ? (gpsLive ? 'GPS Live' : 'GPS Ready')
                             : 'No GPS',
-                        color: gpsLive
-                            ? success
-                            : (hasFix ? warning : danger),
+                        color: hasFix ? primary : danger,
                         active: hasFix,
-                      ),
-                      StatusChip(
-                        icon: CupertinoIcons.map_pin_ellipse,
-                        label: hasFix ? 'Located' : 'Locating',
-                        color: hasFix ? primary : muted,
-                        active: hasFix,
-                      ),
-                      StatusChip(
-                        icon: CupertinoIcons.wifi,
-                        label: hasSignal
-                            ? (gpsLive ? 'Signal' : 'Weak')
-                            : 'Offline',
-                        color: gpsLive
-                            ? success
-                            : (hasSignal ? warning : muted),
-                        active: hasSignal,
                       ),
                     ],
                   ),
@@ -613,13 +592,8 @@ class _HeaderRow extends StatelessWidget {
           icon: themeProvider.isDarkMode
               ? CupertinoIcons.sun_max_fill
               : CupertinoIcons.moon_fill,
-          iconColor: themeProvider.isDarkMode
-              ? AppTheme.darkWarning
-              : theme.colorScheme.primary,
-          accent: themeProvider.isDarkMode
-              ? AppTheme.darkWarning
-              : theme.colorScheme.primary,
-          active: true,
+          accent: theme.colorScheme.primary,
+          active: themeProvider.isDarkMode,
           onPressed: themeProvider.toggleTheme,
         ),
       ],
@@ -675,8 +649,8 @@ class _FareHeroCard extends StatelessWidget {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: isDark
-                ? const [Color(0xFF151A24), Color(0xFF1E2636)]
-                : const [Color(0xFF0F172A), Color(0xFF1E3A5F)],
+                ? const [Color(0xFF14171D), Color(0xFF1A1F28)]
+                : const [Color(0xFF121417), Color(0xFF1C2430)],
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
@@ -804,8 +778,7 @@ class _TripStatusBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final success = AppTheme.successOf(context);
-    final warning = AppTheme.warningOf(context);
+    final primary = theme.colorScheme.primary;
     final muted = AppTheme.mutedOf(context);
 
     late final String title;
@@ -816,12 +789,12 @@ class _TripStatusBanner extends StatelessWidget {
     if (meter.isRunning) {
       title = 'Trip in progress';
       subtitle = 'Meter is tracking distance and waiting time';
-      color = success;
+      color = primary;
       icon = CupertinoIcons.checkmark_seal_fill;
     } else if (meter.canResumeTrip) {
       title = 'Trip paused';
       subtitle = 'Resume to continue from current totals';
-      color = warning;
+      color = muted;
       icon = CupertinoIcons.pause_circle_fill;
     } else {
       title = 'Ready to start';
@@ -927,8 +900,6 @@ class _MetricsGrid extends StatelessWidget {
     final fuelUsed =
         meter.kmPerLiter > 0 ? meter.distanceKm / meter.kmPerLiter : 0.0;
     final primary = Theme.of(context).colorScheme.primary;
-    final success = AppTheme.successOf(context);
-    final warning = AppTheme.warningOf(context);
 
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -946,21 +917,21 @@ class _MetricsGrid extends StatelessWidget {
             label: 'Time',
             value: meter.waitingMinutes.toStringAsFixed(1),
             unit: 'waiting min',
-            accent: warning,
+            accent: primary,
           ),
           MetricCard(
             icon: CupertinoIcons.speedometer,
             label: 'Speed',
             value: meter.currentSpeed.toStringAsFixed(0),
             unit: 'km/h',
-            accent: success,
+            accent: primary,
           ),
           MetricCard(
             icon: FontAwesomeIcons.gasPump,
             label: 'Fuel',
             value: fuelUsed.toStringAsFixed(2),
             unit: 'liters est.',
-            accent: warning,
+            accent: primary,
           ),
         ];
 

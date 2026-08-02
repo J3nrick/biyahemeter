@@ -11,27 +11,27 @@ class AppTheme {
   static const Color cardBg = Color(0x33FFFFFF);
   static const Color cardBorder = Color(0x22FFFFFF);
 
-  // ── Light palette ──
-  static const Color lightBackground = Color(0xFFF4F6FA);
+  // ── Light palette (restrained: neutrals + one accent + danger) ──
+  static const Color lightBackground = Color(0xFFF5F6F8);
   static const Color lightCard = Color(0xFFFFFFFF);
-  static const Color lightAccent = Color(0xFF2563EB);
-  static const Color lightSuccess = Color(0xFF16A34A);
-  static const Color lightWarning = Color(0xFFF59E0B);
-  static const Color lightDanger = Color(0xFFDC2626);
-  static const Color lightOnSurface = Color(0xFF0F172A);
-  static const Color lightOnSurfaceMuted = Color(0xFF64748B);
-  static const Color lightBorder = Color(0xFFE2E8F0);
+  static const Color lightAccent = Color(0xFF1F4B99);
+  static const Color lightSuccess = Color(0xFF1F4B99); // aligned with accent
+  static const Color lightWarning = Color(0xFF5B6472); // neutral, not amber
+  static const Color lightDanger = Color(0xFFB42318);
+  static const Color lightOnSurface = Color(0xFF121417);
+  static const Color lightOnSurfaceMuted = Color(0xFF6B7280);
+  static const Color lightBorder = Color(0xFFE5E7EB);
 
   // ── Dark palette ──
-  static const Color darkBackground = Color(0xFF0F1115);
-  static const Color darkCard = Color(0xFF1B1F28);
-  static const Color darkAccent = Color(0xFF60A5FA);
-  static const Color darkSuccess = Color(0xFF22C55E);
-  static const Color darkWarning = Color(0xFFFBBF24);
-  static const Color darkDanger = Color(0xFFEF4444);
-  static const Color darkOnSurface = Color(0xFFF1F5F9);
-  static const Color darkOnSurfaceMuted = Color(0xFF94A3B8);
-  static const Color darkBorder = Color(0xFF2A3140);
+  static const Color darkBackground = Color(0xFF0E1014);
+  static const Color darkCard = Color(0xFF181B22);
+  static const Color darkAccent = Color(0xFF7AA2E3);
+  static const Color darkSuccess = Color(0xFF7AA2E3); // aligned with accent
+  static const Color darkWarning = Color(0xFF9AA3B2); // neutral
+  static const Color darkDanger = Color(0xFFE35D5D);
+  static const Color darkOnSurface = Color(0xFFF3F4F6);
+  static const Color darkOnSurfaceMuted = Color(0xFF9CA3AF);
+  static const Color darkBorder = Color(0xFF2A2F3A);
 
   static TextTheme _textTheme(Brightness brightness) {
     final base = brightness == Brightness.dark ? darkOnSurface : lightOnSurface;
@@ -166,14 +166,9 @@ class AppTheme {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return [
       BoxShadow(
-        color: Colors.black.withValues(alpha: isDark ? 0.35 : 0.08),
-        blurRadius: 20,
-        offset: const Offset(0, 8),
-      ),
-      BoxShadow(
-        color: Colors.black.withValues(alpha: isDark ? 0.18 : 0.04),
-        blurRadius: 4,
-        offset: const Offset(0, 2),
+        color: Colors.black.withValues(alpha: isDark ? 0.28 : 0.06),
+        blurRadius: 16,
+        offset: const Offset(0, 6),
       ),
     ];
   }
