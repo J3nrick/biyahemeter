@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -69,6 +67,11 @@ class AgreementsScreen extends StatelessWidget {
                         _ProgressPill(
                           acceptedCount: acceptedCount,
                           total: 3,
+                          onAcceptAll: ag.allAccepted
+                              ? null
+                              : () => context
+                                  .read<AgreementsProvider>()
+                                  .acceptAll(),
                         ),
                         const SizedBox(height: 16),
                         _SectionLabel(
@@ -168,10 +171,12 @@ class _Header extends StatelessWidget {
 class _ProgressPill extends StatelessWidget {
   final int acceptedCount;
   final int total;
+  final VoidCallback? onAcceptAll;
 
   const _ProgressPill({
     required this.acceptedCount,
     required this.total,
+    this.onAcceptAll,
   });
 
   @override
@@ -203,10 +208,22 @@ class _ProgressPill extends StatelessWidget {
                   ),
                 ),
               ),
-              Text(
-                '${(progress * 100).round()}%',
-                style: theme.textTheme.labelMedium?.copyWith(color: muted),
-              ),
+              if (onAcceptAll != null)
+                TextButton(
+                  onPressed: onAcceptAll,
+                  style: TextButton.styleFrom(
+                    foregroundColor: primary,
+                    padding: const EdgeInsets.symmetric(horizontal: 8),
+                    minimumSize: Size.zero,
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: const Text('Accept all'),
+                )
+              else
+                Text(
+                  '${(progress * 100).round()}%',
+                  style: theme.textTheme.labelMedium?.copyWith(color: muted),
+                ),
             ],
           ),
           const SizedBox(height: 10),
@@ -261,54 +278,49 @@ class _AgreementsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(22),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.96),
-            borderRadius: BorderRadius.circular(22),
-            border: Border.all(color: AppTheme.borderOf(context)),
-            boxShadow: AppTheme.softShadow(context),
+    // Avoid BackdropFilter here — on Flutter web it can break hit-testing on
+    // sibling tiles so later agreements never receive taps.
+    return Container(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: AppTheme.borderOf(context)),
+        boxShadow: AppTheme.softShadow(context),
+      ),
+      child: Column(
+        children: [
+          _AgreementTile(
+            icon: CupertinoIcons.doc_text_fill,
+            title: 'Terms & Conditions',
+            subtitle: 'Usage rules, liability terms, and driver responsibility.',
+            value: ag.acceptedTerms,
+            isFirst: true,
+            onTap: () => context
+                .read<AgreementsProvider>()
+                .toggleTerms(!ag.acceptedTerms),
           ),
-          child: Column(
-            children: [
-              _AgreementTile(
-                icon: CupertinoIcons.doc_text_fill,
-                title: 'Terms & Conditions',
-                subtitle: 'Usage rules, liability terms, and driver responsibility.',
-                value: ag.acceptedTerms,
-                isFirst: true,
-                onTap: () => context
-                    .read<AgreementsProvider>()
-                    .toggleTerms(!ag.acceptedTerms),
-              ),
-              Divider(height: 1, color: AppTheme.borderOf(context)),
-              _AgreementTile(
-                icon: CupertinoIcons.location_solid,
-                title: 'Data Privacy & GPS',
-                subtitle: 'Allow location access for accurate trip distance.',
-                value: ag.acceptedPrivacy,
-                onTap: () => context
-                    .read<AgreementsProvider>()
-                    .togglePrivacy(!ag.acceptedPrivacy),
-              ),
-              Divider(height: 1, color: AppTheme.borderOf(context)),
-              _AgreementTile(
-                icon: FontAwesomeIcons.gasPump,
-                title: 'PH Gas Price Notice',
-                subtitle: 'Gas prices are manually set and may change locally.',
-                value: ag.verifiedGasData,
-                isLast: true,
-                useFaIcon: true,
-                onTap: () => context
-                    .read<AgreementsProvider>()
-                    .toggleGasData(!ag.verifiedGasData),
-              ),
-            ],
+          Divider(height: 1, color: AppTheme.borderOf(context)),
+          _AgreementTile(
+            icon: CupertinoIcons.location_solid,
+            title: 'Data Privacy & GPS',
+            subtitle: 'Allow location access for accurate trip distance.',
+            value: ag.acceptedPrivacy,
+            onTap: () => context
+                .read<AgreementsProvider>()
+                .togglePrivacy(!ag.acceptedPrivacy),
           ),
-        ),
+          Divider(height: 1, color: AppTheme.borderOf(context)),
+          _AgreementTile(
+            icon: CupertinoIcons.gauge,
+            title: 'PH Gas Price Notice',
+            subtitle: 'Gas prices are manually set and may change locally.',
+            value: ag.verifiedGasData,
+            isLast: true,
+            onTap: () => context
+                .read<AgreementsProvider>()
+                .toggleGasData(!ag.verifiedGasData),
+          ),
+        ],
       ),
     );
   }
@@ -322,7 +334,6 @@ class _AgreementTile extends StatelessWidget {
   final VoidCallback onTap;
   final bool isFirst;
   final bool isLast;
-  final bool useFaIcon;
 
   const _AgreementTile({
     required this.icon,
@@ -332,7 +343,6 @@ class _AgreementTile extends StatelessWidget {
     required this.onTap,
     this.isFirst = false,
     this.isLast = false,
-    this.useFaIcon = false,
   });
 
   @override
@@ -345,8 +355,10 @@ class _AgreementTile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: () {
-          HapticFeedback.selectionClick();
           onTap();
+          try {
+            HapticFeedback.selectionClick();
+          } catch (_) {}
         },
         borderRadius: BorderRadius.vertical(
           top: isFirst ? const Radius.circular(22) : Radius.zero,
@@ -365,9 +377,7 @@ class _AgreementTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
-                  child: useFaIcon
-                      ? FaIcon(icon, size: 15, color: primary)
-                      : Icon(icon, size: 18, color: primary),
+                  child: Icon(icon, size: 18, color: primary),
                 ),
               ),
               const SizedBox(width: 12),

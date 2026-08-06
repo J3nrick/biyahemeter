@@ -27,4 +27,11 @@ class AgreementsProvider extends ChangeNotifier {
     _verifiedGasData = value;
     notifyListeners();
   }
+
+  void acceptAll() {
+    _acceptedTerms = true;
+    _acceptedPrivacy = true;
+    _verifiedGasData = true;
+    notifyListeners();
+  }
 }

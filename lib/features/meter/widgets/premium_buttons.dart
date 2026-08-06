@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
@@ -43,16 +44,19 @@ class _PressableState extends State<Pressable> {
   }
 
   Future<void> _fireHaptic() async {
-    switch (widget.haptic) {
-      case AppHaptic.selection:
-        await HapticFeedback.selectionClick();
-      case AppHaptic.light:
-        await HapticFeedback.lightImpact();
-      case AppHaptic.medium:
-        await HapticFeedback.mediumImpact();
-      case AppHaptic.heavy:
-        await HapticFeedback.heavyImpact();
-    }
+    if (kIsWeb) return;
+    try {
+      switch (widget.haptic) {
+        case AppHaptic.selection:
+          await HapticFeedback.selectionClick();
+        case AppHaptic.light:
+          await HapticFeedback.lightImpact();
+        case AppHaptic.medium:
+          await HapticFeedback.mediumImpact();
+        case AppHaptic.heavy:
+          await HapticFeedback.heavyImpact();
+      }
+    } catch (_) {}
   }
 
   @override
@@ -71,9 +75,10 @@ class _PressableState extends State<Pressable> {
           color: Colors.transparent,
           child: InkWell(
             onTap: enabled
-                ? () async {
-                    await _fireHaptic();
+                ? () {
+                    // Fire action first so web never stalls on haptic futures.
                     widget.onPressed?.call();
+                    _fireHaptic();
                   }
                 : null,
             onTapDown: enabled ? (_) => _setPressed(true) : null,
