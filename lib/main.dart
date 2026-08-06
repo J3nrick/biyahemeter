@@ -2,19 +2,48 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/core/theme/theme_provider.dart';
+import 'package:biyahe_meter/features/fare/fare_matrix_provider.dart';
+import 'package:biyahe_meter/features/history/history_provider.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_screen.dart';
+import 'package:biyahe_meter/features/onboarding/premium_splash_view.dart';
+import 'package:biyahe_meter/services/analytics_service.dart';
+import 'package:biyahe_meter/services/history_service.dart';
+import 'package:biyahe_meter/services/map_cache_service.dart';
+import 'package:biyahe_meter/services/receipt_service.dart';
+import 'package:biyahe_meter/services/sos_service.dart';
 
-void main() {
-  // Preserve the splash screen until the first frame is rendered.
+Future<void> main() async {
   final WidgetsBinding widgetsBinding =
       WidgetsFlutterBinding.ensureInitialized();
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+
+  await Hive.initFlutter();
+
+  final historyService = HistoryService();
+  final mapCache = MapCacheService();
+  final fareMatrix = FareMatrixProvider();
+  final meter = MeterProvider()..applyFareMatrix(fareMatrix);
+  final historyProvider = HistoryProvider(historyService, AnalyticsService());
+
+  // Kick off non-blocking init — do not delay first frame / splash handoff.
+  Future<void> warmUp() async {
+    try {
+      await historyService.init();
+      await historyProvider.load();
+    } catch (_) {}
+    try {
+      await mapCache.init();
+    } catch (_) {}
+  }
+
+  warmUp();
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -22,11 +51,30 @@ void main() {
       statusBarIconBrightness: Brightness.light,
     ),
   );
-  runApp(const BiyaheMeterApp());
+
+  runApp(
+    BiyaheMeterApp(
+      fareMatrix: fareMatrix,
+      meter: meter,
+      history: historyProvider,
+      mapCache: mapCache,
+    ),
+  );
 }
 
 class BiyaheMeterApp extends StatelessWidget {
-  const BiyaheMeterApp({super.key});
+  final FareMatrixProvider fareMatrix;
+  final MeterProvider meter;
+  final HistoryProvider history;
+  final MapCacheService mapCache;
+
+  const BiyaheMeterApp({
+    super.key,
+    required this.fareMatrix,
+    required this.meter,
+    required this.history,
+    required this.mapCache,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +82,13 @@ class BiyaheMeterApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(create: (_) => AgreementsProvider()),
-        ChangeNotifierProvider(create: (_) => MeterProvider()),
+        ChangeNotifierProvider.value(value: fareMatrix),
+        ChangeNotifierProvider.value(value: meter),
+        ChangeNotifierProvider.value(value: history),
+        ChangeNotifierProvider.value(value: mapCache),
+        Provider(create: (_) => ReceiptService()),
+        Provider(create: (_) => SosService()),
+        Provider(create: (_) => AnalyticsService()),
       ],
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, _) {
@@ -57,7 +111,7 @@ class BiyaheMeterApp extends StatelessWidget {
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
               themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
-              home: const _SplashGate(child: AgreementsScreen()),
+              home: const _SplashGate(),
             ),
           );
         },
@@ -66,29 +120,32 @@ class BiyaheMeterApp extends StatelessWidget {
   }
 }
 
-/// Removes the native splash screen after the first frame is drawn,
-/// ensuring the [AgreementsScreen] is fully laid out before the
-/// splash disappears — no white flash.
+/// Native/HTML splash → premium animated intro → agreements.
 class _SplashGate extends StatefulWidget {
-  final Widget child;
-  const _SplashGate({required this.child});
+  const _SplashGate();
 
   @override
   State<_SplashGate> createState() => _SplashGateState();
 }
 
-class _SplashGateState extends State<_SplashGate> {
+class _SplashGateState extends State<_SplashGate>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _intro;
+  bool _showAgreements = false;
+  bool _nativeSplashRemoved = false;
+
   @override
   void initState() {
     super.initState();
-    // Run while the native splash is still pinned — driver sees the GPS
-    // permission dialog before the app UI appears (clean, professional UX).
+    _intro = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    )..forward();
+
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      // Hold splash visible for at least 1.5 s — avoids an instant flash on
-      // fast devices and covers Flutter engine JS load time on web.
-      final minDelay = Future.delayed(const Duration(milliseconds: 1500));
-      // permission_handler is not supported on web — skip it to prevent
-      // an UnimplementedError that would keep the splash pinned forever.
+      _removeNativeSplash();
+
+      final minDelay = Future.delayed(const Duration(milliseconds: 2000));
       try {
         if (!kIsWeb) {
           try {
@@ -96,15 +153,54 @@ class _SplashGateState extends State<_SplashGate> {
           } catch (_) {}
         }
         await minDelay;
-      } finally {
-        // Always dismiss splash — even if permission/delay path throws.
-        try {
-          FlutterNativeSplash.remove();
-        } catch (_) {}
+      } catch (_) {
+        // Keep splash→agreements handoff even if permission/delay fails.
       }
+
+      _removeNativeSplash();
+      if (!mounted) return;
+      setState(() => _showAgreements = true);
     });
   }
 
+  void _removeNativeSplash() {
+    if (_nativeSplashRemoved) return;
+    _nativeSplashRemoved = true;
+    try {
+      FlutterNativeSplash.remove();
+    } catch (_) {}
+  }
+
   @override
-  Widget build(BuildContext context) => widget.child;
+  void dispose() {
+    _intro.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 520),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.02),
+              end: Offset.zero,
+            ).animate(animation),
+            child: child,
+          ),
+        );
+      },
+      child: _showAgreements
+          ? const AgreementsScreen(key: ValueKey('agreements'))
+          : PremiumSplashView(
+              key: const ValueKey('splash'),
+              controller: _intro,
+            ),
+    );
+  }
 }

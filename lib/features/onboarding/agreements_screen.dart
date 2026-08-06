@@ -1,3 +1,6 @@
+import 'dart:ui';
+
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
@@ -18,122 +21,322 @@ class AgreementsScreen extends StatelessWidget {
     final meter = context.watch<MeterProvider>();
     final theme = Theme.of(context);
     final muted = AppTheme.mutedOf(context);
+    final primary = theme.colorScheme.primary;
     final width = MediaQuery.sizeOf(context).width;
     final isNarrow = width < 360;
-    final horizontal = width >= 700 ? (width - 520) / 2 : 22.0;
+    final horizontal = width >= 700 ? (width - 540) / 2 : 20.0;
+    final acceptedCount = [
+      ag.acceptedTerms,
+      ag.acceptedPrivacy,
+      ag.verifiedGasData,
+    ].where((v) => v).length;
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
-      body: SafeArea(
-        child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(horizontal, 28, horizontal, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          Positioned(
+            top: -100,
+            left: -60,
+            child: IgnorePointer(
+              child: Container(
+                width: 260,
+                height: 260,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [
+                      primary.withValues(alpha: 0.10),
+                      primary.withValues(alpha: 0),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            child: Column(
+              children: [
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: EdgeInsets.fromLTRB(horizontal, 20, horizontal, 16),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        _Header(isNarrow: isNarrow, muted: muted),
+                        const SizedBox(height: 22),
+                        _ProgressPill(
+                          acceptedCount: acceptedCount,
+                          total: 3,
+                        ),
+                        const SizedBox(height: 16),
+                        _SectionLabel(
+                          title: 'Agreements',
+                          subtitle: 'Required before starting the meter',
+                        ),
+                        const SizedBox(height: 10),
+                        _AgreementsCard(ag: ag),
+                        const SizedBox(height: 18),
+                        _SectionLabel(
+                          title: 'Trip defaults',
+                          subtitle: 'You can fine-tune these anytime in settings',
+                        ),
+                        const SizedBox(height: 10),
+                        _DefaultsCard(meter: meter),
+                        const SizedBox(height: 12),
+                      ],
+                    ),
+                  ),
+                ),
+                _BottomActionBar(
+                  enabled: ag.allAccepted,
+                  acceptedCount: acceptedCount,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _Header extends StatelessWidget {
+  final bool isNarrow;
+  final Color muted;
+
+  const _Header({required this.isNarrow, required this.muted});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final primary = theme.colorScheme.primary;
+
+    return Column(
+      children: [
+        Hero(
+          tag: 'biyahemeter-logo',
+          child: Container(
+            padding: EdgeInsets.all(isNarrow ? 14 : 16),
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface.withValues(alpha: 0.94),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppTheme.borderOf(context)),
+              boxShadow: AppTheme.softShadow(context),
+            ),
+            child: Image.asset(
+              'assets/images/logo.png',
+              height: isNarrow ? 72 : 86,
+              fit: BoxFit.contain,
+            ),
+          ),
+        ),
+        const SizedBox(height: 18),
+        Text(
+          'BiyaheMeter',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.headlineLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+            letterSpacing: -0.7,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          'PH DRIVER READY',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: primary,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 1.6,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Review the essentials once, then start metering with clarity and control.',
+          textAlign: TextAlign.center,
+          style: theme.textTheme.bodyMedium?.copyWith(
+            color: muted,
+            height: 1.45,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProgressPill extends StatelessWidget {
+  final int acceptedCount;
+  final int total;
+
+  const _ProgressPill({
+    required this.acceptedCount,
+    required this.total,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = AppTheme.mutedOf(context);
+    final primary = theme.colorScheme.primary;
+    final progress = acceptedCount / total;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppTheme.borderOf(context)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              _buildHeader(context, isNarrow, muted),
-              const SizedBox(height: 28),
-              _buildAgreementsCard(context, ag),
-              const SizedBox(height: 14),
-              _buildDataCard(context, meter),
-              const SizedBox(height: 26),
-              _buildAcceptButton(context, ag.allAccepted),
+              Icon(CupertinoIcons.checkmark_seal, size: 16, color: primary),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  '$acceptedCount of $total agreements accepted',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              Text(
+                '${(progress * 100).round()}%',
+                style: theme.textTheme.labelMedium?.copyWith(color: muted),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(99),
+            child: LinearProgressIndicator(
+              value: progress,
+              minHeight: 4,
+              backgroundColor: AppTheme.borderOf(context),
+              color: primary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SectionLabel extends StatelessWidget {
+  final String title;
+  final String subtitle;
+
+  const _SectionLabel({required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = AppTheme.mutedOf(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          subtitle,
+          style: theme.textTheme.bodySmall?.copyWith(color: muted),
+        ),
+      ],
+    );
+  }
+}
+
+class _AgreementsCard extends StatelessWidget {
+  final AgreementsProvider ag;
+
+  const _AgreementsCard({required this.ag});
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(22),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface.withValues(alpha: 0.96),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppTheme.borderOf(context)),
+            boxShadow: AppTheme.softShadow(context),
+          ),
+          child: Column(
+            children: [
+              _AgreementTile(
+                icon: CupertinoIcons.doc_text_fill,
+                title: 'Terms & Conditions',
+                subtitle: 'Usage rules, liability terms, and driver responsibility.',
+                value: ag.acceptedTerms,
+                isFirst: true,
+                onTap: () => context
+                    .read<AgreementsProvider>()
+                    .toggleTerms(!ag.acceptedTerms),
+              ),
+              Divider(height: 1, color: AppTheme.borderOf(context)),
+              _AgreementTile(
+                icon: CupertinoIcons.location_solid,
+                title: 'Data Privacy & GPS',
+                subtitle: 'Allow location access for accurate trip distance.',
+                value: ag.acceptedPrivacy,
+                onTap: () => context
+                    .read<AgreementsProvider>()
+                    .togglePrivacy(!ag.acceptedPrivacy),
+              ),
+              Divider(height: 1, color: AppTheme.borderOf(context)),
+              _AgreementTile(
+                icon: FontAwesomeIcons.gasPump,
+                title: 'PH Gas Price Notice',
+                subtitle: 'Gas prices are manually set and may change locally.',
+                value: ag.verifiedGasData,
+                isLast: true,
+                useFaIcon: true,
+                onTap: () => context
+                    .read<AgreementsProvider>()
+                    .toggleGasData(!ag.verifiedGasData),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildHeader(BuildContext context, bool isNarrow, Color muted) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.center,
-      children: [
-        Hero(
-          tag: 'biyahemeter-logo',
-          child: Image(
-            image: const AssetImage('assets/images/logo.png'),
-            height: isNarrow ? 120 : 148,
-            fit: BoxFit.contain,
-            alignment: Alignment.center,
-          ),
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'BiyaheMeter',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.headlineLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.6,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Before you begin, please read and agree to the following.',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.bodyLarge?.copyWith(
-            color: muted,
-            height: 1.45,
-            fontSize: isNarrow ? 15 : 16,
-          ),
-        ),
-      ],
-    );
-  }
+class _AgreementTile extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final VoidCallback onTap;
+  final bool isFirst;
+  final bool isLast;
+  final bool useFaIcon;
 
-  Widget _buildAgreementsCard(BuildContext context, AgreementsProvider ag) {
-    final theme = Theme.of(context);
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.borderOf(context)),
-        boxShadow: AppTheme.softShadow(context),
-      ),
-      child: Column(
-        children: [
-          _checkRow(
-            context: context,
-            title: 'Terms & Conditions',
-            subtitle: 'I agree to the usage rules and liability terms.',
-            value: ag.acceptedTerms,
-            onTap: () =>
-                context.read<AgreementsProvider>().toggleTerms(!ag.acceptedTerms),
-          ),
-          Divider(height: 1, color: AppTheme.borderOf(context)),
-          _checkRow(
-            context: context,
-            title: 'Data Privacy & GPS Tracking',
-            subtitle: 'I allow location access for trip distance tracking.',
-            value: ag.acceptedPrivacy,
-            onTap: () => context
-                .read<AgreementsProvider>()
-                .togglePrivacy(!ag.acceptedPrivacy),
-          ),
-          Divider(height: 1, color: AppTheme.borderOf(context)),
-          _checkRow(
-            context: context,
-            title: 'PH Gas Price Acknowledgment',
-            subtitle: 'I understand that gas prices are manually updated.',
-            value: ag.verifiedGasData,
-            onTap: () => context
-                .read<AgreementsProvider>()
-                .toggleGasData(!ag.verifiedGasData),
-            isLast: true,
-          ),
-        ],
-      ),
-    );
-  }
+  const _AgreementTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.value,
+    required this.onTap,
+    this.isFirst = false,
+    this.isLast = false,
+    this.useFaIcon = false,
+  });
 
-  Widget _checkRow({
-    required BuildContext context,
-    required String title,
-    required String subtitle,
-    required bool value,
-    required VoidCallback onTap,
-    bool isLast = false,
-  }) {
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
     final muted = AppTheme.mutedOf(context);
@@ -146,44 +349,28 @@ class AgreementsScreen extends StatelessWidget {
           onTap();
         },
         borderRadius: BorderRadius.vertical(
-          top: title.startsWith('Terms')
-              ? const Radius.circular(20)
-              : Radius.zero,
-          bottom: isLast ? const Radius.circular(20) : Radius.zero,
+          top: isFirst ? const Radius.circular(22) : Radius.zero,
+          bottom: isLast ? const Radius.circular(22) : Radius.zero,
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 26,
-                height: 26,
-                margin: const EdgeInsets.only(top: 1),
+              Container(
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                  color: value ? primary : theme.colorScheme.surface,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: value ? primary : AppTheme.borderOf(context),
-                    width: 1.5,
-                  ),
-                  boxShadow: value
-                      ? [
-                          BoxShadow(
-                            color: primary.withValues(alpha: 0.28),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
-                          ),
-                        ]
-                      : null,
+                  color: primary.withValues(alpha: 0.10),
+                  borderRadius: BorderRadius.circular(12),
                 ),
-                child: value
-                    ? Icon(Icons.check_rounded,
-                        color: theme.colorScheme.onPrimary, size: 16)
-                    : const SizedBox.shrink(),
+                child: Center(
+                  child: useFaIcon
+                      ? FaIcon(icon, size: 15, color: primary)
+                      : Icon(icon, size: 18, color: primary),
+                ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -191,7 +378,7 @@ class AgreementsScreen extends StatelessWidget {
                     Text(
                       title,
                       style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w700,
                         height: 1.2,
                       ),
                     ),
@@ -206,76 +393,111 @@ class AgreementsScreen extends StatelessWidget {
                   ],
                 ),
               ),
+              const SizedBox(width: 10),
+              AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOutCubic,
+                width: 26,
+                height: 26,
+                decoration: BoxDecoration(
+                  color: value ? primary : theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: value ? primary : AppTheme.borderOf(context),
+                    width: 1.5,
+                  ),
+                ),
+                child: value
+                    ? Icon(
+                        Icons.check_rounded,
+                        size: 16,
+                        color: theme.colorScheme.onPrimary,
+                      )
+                    : const SizedBox.shrink(),
+              ),
             ],
           ),
         ),
       ),
     );
   }
+}
 
-  Widget _buildDataCard(BuildContext context, MeterProvider meter) {
+class _DefaultsCard extends StatelessWidget {
+  final MeterProvider meter;
+
+  const _DefaultsCard({required this.meter});
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = AppTheme.mutedOf(context);
-
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(22),
         border: Border.all(color: AppTheme.borderOf(context)),
         boxShadow: AppTheme.softShadow(context),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-            child: Text(
-              'Current trip defaults',
-              style: theme.textTheme.labelMedium?.copyWith(
-                color: muted,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Divider(height: 1, color: AppTheme.borderOf(context)),
-          _dataRow(
-            context: context,
+          _DefaultRow(
             icon: FontAwesomeIcons.gasPump,
-            label: 'Fuel Efficiency',
+            label: 'Fuel efficiency',
             value: '${meter.kmPerLiter.toStringAsFixed(1)} km/L',
+            isFirst: true,
           ),
           Divider(height: 1, color: AppTheme.borderOf(context)),
-          _dataRow(
-            context: context,
+          _DefaultRow(
             icon: FontAwesomeIcons.pesoSign,
-            label: 'Gas Price',
+            label: 'Gas price',
             value: '₱${meter.gasPricePerLiter.toStringAsFixed(2)}/L',
           ),
           Divider(height: 1, color: AppTheme.borderOf(context)),
-          _dataRow(
-            context: context,
+          _DefaultRow(
             icon: FontAwesomeIcons.coins,
-            label: 'Base Fare',
+            label: 'Base fare',
             value: '₱${meter.baseFare.toStringAsFixed(0)}',
+            isLast: true,
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _dataRow({
-    required BuildContext context,
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
+class _DefaultRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+  final bool isFirst;
+  final bool isLast;
+
+  const _DefaultRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+    this.isFirst = false,
+    this.isLast = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final muted = AppTheme.mutedOf(context);
+    final primary = theme.colorScheme.primary;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
       child: Row(
         children: [
-          FaIcon(icon, size: 14, color: muted),
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Center(child: FaIcon(icon, size: 13, color: primary)),
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(label, style: theme.textTheme.bodyMedium),
@@ -283,33 +505,93 @@ class AgreementsScreen extends StatelessWidget {
           Text(
             value,
             style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ],
       ),
     );
   }
+}
 
-  Widget _buildAcceptButton(BuildContext context, bool enabled) {
-    return PremiumConfirmButton(
-      label: 'Accept & Continue',
-      enabled: enabled,
-      hintWhenDisabled: 'Check all agreements to continue',
-      icon: Icons.arrow_forward_rounded,
-      onPressed: enabled
-          ? () => Navigator.pushReplacement(
-                context,
-                PageRouteBuilder(
-                  pageBuilder: (context, animation, secondaryAnimation) =>
-                      const HomeScreen(),
-                  transitionsBuilder:
-                      (context, animation, secondaryAnimation, child) =>
-                          FadeTransition(opacity: animation, child: child),
-                  transitionDuration: const Duration(milliseconds: 350),
-                ),
-              )
-          : null,
+class _BottomActionBar extends StatelessWidget {
+  final bool enabled;
+  final int acceptedCount;
+
+  const _BottomActionBar({
+    required this.enabled,
+    required this.acceptedCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final muted = AppTheme.mutedOf(context);
+    final bottom = MediaQuery.paddingOf(context).bottom;
+
+    return Container(
+      padding: EdgeInsets.fromLTRB(20, 12, 20, bottom + 14),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.96),
+        border: Border(
+          top: BorderSide(color: AppTheme.borderOf(context)),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.06),
+            blurRadius: 16,
+            offset: const Offset(0, -4),
+          ),
+        ],
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          PremiumConfirmButton(
+            label: 'Accept & Continue',
+            enabled: enabled,
+            hintWhenDisabled: acceptedCount == 0
+                ? 'Accept all three agreements to continue'
+                : 'Accept the remaining agreement${3 - acceptedCount == 1 ? '' : 's'}',
+            icon: Icons.arrow_forward_rounded,
+            onPressed: enabled
+                ? () => Navigator.pushReplacement(
+                      context,
+                      PageRouteBuilder(
+                        pageBuilder: (context, animation, secondaryAnimation) =>
+                            const HomeScreen(),
+                        transitionsBuilder: (context, animation,
+                                secondaryAnimation, child) =>
+                            FadeTransition(
+                          opacity: animation,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.03),
+                              end: Offset.zero,
+                            ).animate(
+                              CurvedAnimation(
+                                parent: animation,
+                                curve: Curves.easeOutCubic,
+                              ),
+                            ),
+                            child: child,
+                          ),
+                        ),
+                        transitionDuration: const Duration(milliseconds: 380),
+                      ),
+                    )
+                : null,
+          ),
+          if (enabled) ...[
+            const SizedBox(height: 8),
+            Text(
+              'You can update fare settings anytime from the dashboard.',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelSmall?.copyWith(color: muted),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }

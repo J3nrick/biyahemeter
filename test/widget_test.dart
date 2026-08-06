@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:biyahe_meter/core/models/fare_preset.dart';
 import 'package:biyahe_meter/core/utils/trip_calculator.dart';
 
 void main() {
@@ -29,6 +30,22 @@ void main() {
         waitingMinutes: 5,
       );
       expect(total, 45.0 + 65.0 + 10.0);
+    });
+
+    test('LTFRB regular taxi matrix with 20% discount', () {
+      final breakdown = TripCalculator.calculateBreakdown(
+        preset: FarePreset.byId(FarePresetId.regularTaxi),
+        distanceKm: 10,
+        waitingMinutes: 5,
+        kmPerLiter: 12,
+        gasPricePerLiter: 62.5,
+        applyDiscount: true,
+        discountPercent: 20,
+      );
+      // 45 + (10*13.50) + (5*2) = 45 + 135 + 10 = 190; 20% off => 152
+      expect(breakdown.subtotal, 190.0);
+      expect(breakdown.discountAmount, 38.0);
+      expect(breakdown.total, 152.0);
     });
   });
 }

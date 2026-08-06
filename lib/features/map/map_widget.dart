@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:biyahe_meter/core/theme/theme_provider.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
+import 'package:biyahe_meter/services/map_cache_service.dart';
 import 'package:biyahe_meter/features/meter/widgets/premium_buttons.dart';
 
 class MapWidget extends StatefulWidget {
@@ -153,6 +154,7 @@ class _MapWidgetState extends State<MapWidget>
   Widget build(BuildContext context) {
     final meter = context.watch<MeterProvider>();
     final isDarkMode = context.watch<ThemeProvider>().isDarkMode;
+    final mapCache = context.watch<MapCacheService>();
     final markerPosition = meter.currentPosition ?? _initialPosition;
     final initialCenter =
         _initialPosition ?? meter.currentPosition ?? _defaultCenter;
@@ -181,6 +183,7 @@ class _MapWidgetState extends State<MapWidget>
               subdomains: isDarkMode ? const ['a', 'b', 'c', 'd'] : const [],
               userAgentPackageName: 'com.biyahemeter.app',
               maxZoom: 19,
+              tileProvider: mapCache.createTileProvider(),
             ),
 
             // Attribution

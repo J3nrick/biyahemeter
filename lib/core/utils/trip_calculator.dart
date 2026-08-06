@@ -1,3 +1,27 @@
+import 'package:biyahe_meter/core/models/fare_preset.dart';
+
+class FareBreakdown {
+  final double flagdown;
+  final double distanceFare;
+  final double waitingFare;
+  final double subtotal;
+  final double discountPercent;
+  final double discountAmount;
+  final double total;
+  final bool isFuelBased;
+
+  const FareBreakdown({
+    required this.flagdown,
+    required this.distanceFare,
+    required this.waitingFare,
+    required this.subtotal,
+    required this.discountPercent,
+    required this.discountAmount,
+    required this.total,
+    required this.isFuelBased,
+  });
+}
+
 class TripCalculator {
   static const double baseFare = 45.0;
   static const double waitingSurchargePerMinute = 2.0;
@@ -42,5 +66,66 @@ class TripCalculator {
           baseFare: baseFare,
         ) +
         calculateWaitingSurcharge(waitingMinutes);
+  }
+
+  /// LTFRB / matrix-style or fuel-based breakdown with optional discount.
+  static FareBreakdown calculateBreakdown({
+    required FarePreset preset,
+    required double distanceKm,
+    required double waitingMinutes,
+    required double kmPerLiter,
+    required double gasPricePerLiter,
+    double? customFlagdown,
+    bool applyDiscount = false,
+    double discountPercent = 20.0,
+  }) {
+    final flagdown = customFlagdown ?? preset.flagdown;
+    late final double distanceFare;
+    late final double waitingFare;
+
+    if (preset.isFuelBased) {
+      final fuelComponent = (kmPerLiter > 0 && gasPricePerLiter > 0)
+          ? (distanceKm / kmPerLiter) * gasPricePerLiter
+          : 0.0;
+      distanceFare = fuelComponent;
+      waitingFare = waitingMinutes * waitingSurchargePerMinute;
+    } else {
+      distanceFare = distanceKm * preset.ratePerKm;
+      waitingFare = waitingMinutes * preset.waitingPerMinute;
+    }
+
+    final subtotal = flagdown + distanceFare + waitingFare;
+    final discount = applyDiscount
+        ? subtotal * (discountPercent.clamp(0, 100) / 100.0)
+        : 0.0;
+    final total = (subtotal - discount).clamp(0.0, double.infinity);
+
+    return FareBreakdown(
+      flagdown: flagdown,
+      distanceFare: distanceFare,
+      waitingFare: waitingFare,
+      subtotal: subtotal,
+      discountPercent: applyDiscount ? discountPercent : 0,
+      discountAmount: discount,
+      total: total,
+      isFuelBased: preset.isFuelBased,
+    );
+  }
+
+  static double estimateFuelLiters({
+    required double distanceKm,
+    required double kmPerLiter,
+  }) {
+    if (kmPerLiter <= 0) return 0;
+    return distanceKm / kmPerLiter;
+  }
+
+  static double estimateFuelCost({
+    required double distanceKm,
+    required double kmPerLiter,
+    required double gasPricePerLiter,
+  }) {
+    return estimateFuelLiters(distanceKm: distanceKm, kmPerLiter: kmPerLiter) *
+        gasPricePerLiter;
   }
 }
