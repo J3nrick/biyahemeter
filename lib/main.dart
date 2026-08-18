@@ -12,6 +12,7 @@ import 'package:biyahe_meter/features/history/history_provider.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_screen.dart';
+import 'package:biyahe_meter/features/onboarding/premium_splash_view.dart';
 import 'package:biyahe_meter/services/analytics_service.dart';
 import 'package:biyahe_meter/services/history_service.dart';
 import 'package:biyahe_meter/services/map_cache_service.dart';
@@ -117,11 +118,67 @@ class BiyaheMeterApp extends StatelessWidget {
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
               themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
-              home: const AgreementsScreen(),
+              home: const _SplashGate(),
             ),
           );
         },
       ),
+    );
+  }
+}
+
+/// Seamless splash -> onboarding agreements transition gate.
+class _SplashGate extends StatefulWidget {
+  const _SplashGate();
+
+  @override
+  State<_SplashGate> createState() => _SplashGateState();
+}
+
+class _SplashGateState extends State<_SplashGate>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _splashController;
+  bool _showAgreements = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _splashController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1600),
+    )..forward();
+
+    // After 1.6s animation completes, smoothly transition to AgreementsScreen
+    Future.delayed(const Duration(milliseconds: 1600), () {
+      if (!mounted) return;
+      setState(() => _showAgreements = true);
+    });
+  }
+
+  @override
+  void dispose() {
+    _splashController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 400),
+      switchInCurve: Curves.easeOutCubic,
+      switchOutCurve: Curves.easeInCubic,
+      transitionBuilder: (child, animation) {
+        return FadeTransition(
+          opacity: animation,
+          child: child,
+        );
+      },
+      child: _showAgreements
+          ? const AgreementsScreen(key: ValueKey('agreements'))
+          : PremiumSplashView(
+              key: const ValueKey('splash'),
+              controller: _splashController,
+            ),
     );
   }
 }

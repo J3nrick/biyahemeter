@@ -18,11 +18,10 @@ class AgreementsScreen extends StatelessWidget {
     final ag = context.watch<AgreementsProvider>();
     final meter = context.watch<MeterProvider>();
     final theme = Theme.of(context);
-    final muted = AppTheme.mutedOf(context);
-    final primary = theme.colorScheme.primary;
     final width = MediaQuery.sizeOf(context).width;
     final isNarrow = width < 360;
     final horizontal = width >= 700 ? (width - 540) / 2 : 20.0;
+
     final acceptedCount = [
       ag.acceptedTerms,
       ag.acceptedPrivacy,
@@ -34,6 +33,7 @@ class AgreementsScreen extends StatelessWidget {
       body: Stack(
         fit: StackFit.expand,
         children: [
+          // Ambient background glow
           Positioned(
             top: -100,
             left: -60,
@@ -45,8 +45,8 @@ class AgreementsScreen extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      primary.withValues(alpha: 0.10),
-                      primary.withValues(alpha: 0),
+                      theme.colorScheme.primary.withValues(alpha: 0.10),
+                      theme.colorScheme.primary.withValues(alpha: 0),
                     ],
                   ),
                 ),
@@ -58,12 +58,13 @@ class AgreementsScreen extends StatelessWidget {
               children: [
                 Expanded(
                   child: SingleChildScrollView(
-                    padding: EdgeInsets.fromLTRB(horizontal, 20, horizontal, 16),
+                    padding:
+                        EdgeInsets.fromLTRB(horizontal, 20, horizontal, 16),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _Header(isNarrow: isNarrow, muted: muted),
-                        const SizedBox(height: 22),
+                        _Header(isNarrow: isNarrow),
+                        const SizedBox(height: 20),
                         _ProgressPill(
                           acceptedCount: acceptedCount,
                           total: 3,
@@ -73,21 +74,23 @@ class AgreementsScreen extends StatelessWidget {
                                   .read<AgreementsProvider>()
                                   .acceptAll(),
                         ),
-                        const SizedBox(height: 16),
-                        _SectionLabel(
-                          title: 'Agreements',
-                          subtitle: 'Required before starting the meter',
+                        const SizedBox(height: 18),
+                        const _SectionLabel(
+                          title: 'Travel Safety & Usage Agreement',
+                          subtitle:
+                              'Acknowledge each point below to ensure safe and clear metering.',
                         ),
                         const SizedBox(height: 10),
                         _AgreementsCard(ag: ag),
-                        const SizedBox(height: 18),
-                        _SectionLabel(
-                          title: 'Trip defaults',
-                          subtitle: 'You can fine-tune these anytime in settings',
+                        const SizedBox(height: 22),
+                        const _SectionLabel(
+                          title: 'Initial Trip Defaults',
+                          subtitle:
+                              'Standard baseline values. Adjust anytime in settings.',
                         ),
                         const SizedBox(height: 10),
                         _DefaultsCard(meter: meter),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 16),
                       ],
                     ),
                   ),
@@ -107,14 +110,13 @@ class AgreementsScreen extends StatelessWidget {
 
 class _Header extends StatelessWidget {
   final bool isNarrow;
-  final Color muted;
 
-  const _Header({required this.isNarrow, required this.muted});
+  const _Header({required this.isNarrow});
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
+    final muted = AppTheme.mutedOf(context);
 
     return Column(
       children: [
@@ -130,37 +132,27 @@ class _Header extends StatelessWidget {
             ),
             child: Image.asset(
               'assets/images/logo.png',
-              height: isNarrow ? 72 : 86,
+              height: isNarrow ? 68 : 80,
               fit: BoxFit.contain,
             ),
           ),
         ),
         const SizedBox(height: 18),
         Text(
-          'BiyaheMeter',
+          'Welcome to Byahe Meter',
           textAlign: TextAlign.center,
           style: theme.textTheme.headlineLarge?.copyWith(
             fontWeight: FontWeight.w800,
-            letterSpacing: -0.7,
+            letterSpacing: -0.6,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: 6),
         Text(
-          'PH DRIVER READY',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: primary,
-            fontWeight: FontWeight.w800,
-            letterSpacing: 1.6,
-          ),
-        ),
-        const SizedBox(height: 10),
-        Text(
-          'Review the essentials once, then start metering with clarity and control.',
+          'Before you start your byahe, let\'s make sure we\'re on the same page.',
           textAlign: TextAlign.center,
           style: theme.textTheme.bodyMedium?.copyWith(
             color: muted,
-            height: 1.45,
+            height: 1.4,
           ),
         ),
       ],
@@ -182,8 +174,9 @@ class _ProgressPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final muted = AppTheme.mutedOf(context);
     final primary = theme.colorScheme.primary;
-    final progress = acceptedCount / total;
+    final isComplete = acceptedCount == total;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -191,54 +184,65 @@ class _ProgressPill extends StatelessWidget {
         color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppTheme.borderOf(context)),
+        boxShadow: AppTheme.softShadow(context),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  '$acceptedCount of $total agreements accepted',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
-              if (onAcceptAll != null)
-                TextButton(
-                  onPressed: onAcceptAll,
-                  style: TextButton.styleFrom(
-                    foregroundColor: primary,
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    minimumSize: Size.zero,
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text(
-                    'Accept all',
-                    style: TextStyle(fontWeight: FontWeight.w700),
-                  ),
-                )
-              else
-                Text(
-                  '100%',
-                  style: theme.textTheme.labelSmall?.copyWith(
-                    color: primary,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: LinearProgressIndicator(
-              value: progress,
-              minHeight: 4,
-              backgroundColor: AppTheme.borderOf(context),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: primary.withValues(alpha: isComplete ? 0.16 : 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              isComplete
+                  ? CupertinoIcons.checkmark_seal_fill
+                  : CupertinoIcons.checkmark_seal,
+              size: 16,
               color: primary,
             ),
           ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isComplete
+                      ? '3 of 3 acknowledged'
+                      : '$acceptedCount of $total acknowledged',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+                Text(
+                  isComplete
+                      ? 'All requirements satisfied'
+                      : 'Tap cards to acknowledge',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: muted,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          if (onAcceptAll != null)
+            TextButton(
+              onPressed: onAcceptAll,
+              style: TextButton.styleFrom(
+                foregroundColor: primary,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                minimumSize: Size.zero,
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              child: const Text(
+                'Accept all',
+                style: TextStyle(fontWeight: FontWeight.w800, fontSize: 12),
+              ),
+            ),
         ],
       ),
     );
@@ -286,16 +290,17 @@ class _AgreementsCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.borderOf(context)),
         boxShadow: AppTheme.softShadow(context),
       ),
       child: Column(
         children: [
           _AgreementTile(
-            icon: CupertinoIcons.doc_text,
-            title: 'Terms & Conditions',
-            subtitle: 'Usage rules, liability terms, and driver responsibility.',
+            icon: CupertinoIcons.doc_text_fill,
+            title: 'Fare Estimates & Terms',
+            subtitle:
+                'Understand that fares shown are estimates and may vary based on actual traffic conditions.',
             value: ag.acceptedTerms,
             isFirst: true,
             onTap: () => context
@@ -304,9 +309,10 @@ class _AgreementsCard extends StatelessWidget {
           ),
           Divider(height: 1, color: AppTheme.borderOf(context)),
           _AgreementTile(
-            icon: CupertinoIcons.location,
-            title: 'Data Privacy & GPS',
-            subtitle: 'Allow location access for accurate trip distance.',
+            icon: CupertinoIcons.location_fill,
+            title: 'Route & Data Privacy',
+            subtitle:
+                'Allow location access for real-time trip distance calculation. Your location data remains private.',
             value: ag.acceptedPrivacy,
             onTap: () => context
                 .read<AgreementsProvider>()
@@ -314,9 +320,10 @@ class _AgreementsCard extends StatelessWidget {
           ),
           Divider(height: 1, color: AppTheme.borderOf(context)),
           _AgreementTile(
-            icon: CupertinoIcons.gauge,
-            title: 'PH Gas Price Notice',
-            subtitle: 'Gas prices are manually set and may change locally.',
+            icon: CupertinoIcons.gauge_badge_plus,
+            title: 'Responsible Gas & Rate Use',
+            subtitle:
+                'Fuel prices and rates are customizable guides to ensure fair calculations for your byahe.',
             value: ag.verifiedGasData,
             isLast: true,
             onTap: () => context
@@ -353,9 +360,14 @@ class _AgreementTile extends StatelessWidget {
     final theme = Theme.of(context);
     final primary = theme.colorScheme.primary;
     final muted = AppTheme.mutedOf(context);
+    final isDark = theme.brightness == Brightness.dark;
+
+    final tileBg = value
+        ? primary.withValues(alpha: isDark ? 0.08 : 0.04)
+        : Colors.transparent;
 
     return Material(
-      color: Colors.transparent,
+      color: tileBg,
       child: InkWell(
         onTap: () {
           onTap();
@@ -364,29 +376,32 @@ class _AgreementTile extends StatelessWidget {
           } catch (_) {}
         },
         borderRadius: BorderRadius.vertical(
-          top: isFirst ? const Radius.circular(18) : Radius.zero,
-          bottom: isLast ? const Radius.circular(18) : Radius.zero,
+          top: isFirst ? const Radius.circular(20) : Radius.zero,
+          bottom: isLast ? const Radius.circular(20) : Radius.zero,
         ),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 36,
-                height: 36,
+                width: 38,
+                height: 38,
                 decoration: BoxDecoration(
-                  color: primary.withValues(alpha: 0.08),
-                  borderRadius: BorderRadius.circular(10),
+                  color: value
+                      ? primary.withValues(alpha: 0.16)
+                      : primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Center(
                   child: Icon(
                     icon,
-                    size: 18,
+                    size: 19,
                     color: primary,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -398,37 +413,54 @@ class _AgreementTile extends StatelessWidget {
                         height: 1.2,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 3),
                     Text(
                       subtitle,
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: muted,
-                        height: 1.3,
+                        height: 1.35,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 10),
+              const SizedBox(width: 12),
+
+              // Custom visually consistent checkbox indicator (○ / ✓)
               AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 22,
-                height: 22,
+                duration: const Duration(milliseconds: 200),
+                curve: Curves.easeOutCubic,
+                width: 24,
+                height: 24,
                 decoration: BoxDecoration(
-                  color: value ? primary : Colors.transparent,
-                  borderRadius: BorderRadius.circular(6),
+                  color: value ? primary : theme.colorScheme.surface,
+                  borderRadius: BorderRadius.circular(7),
                   border: Border.all(
                     color: value ? primary : AppTheme.borderOf(context),
                     width: 1.5,
                   ),
+                  boxShadow: value
+                      ? [
+                          BoxShadow(
+                            color: primary.withValues(alpha: 0.25),
+                            blurRadius: 6,
+                            offset: const Offset(0, 2),
+                          ),
+                        ]
+                      : null,
                 ),
-                child: value
-                    ? Icon(
-                        Icons.check_rounded,
-                        size: 14,
-                        color: theme.colorScheme.onPrimary,
-                      )
-                    : null,
+                child: Center(
+                  child: AnimatedScale(
+                    scale: value ? 1.0 : 0.0,
+                    duration: const Duration(milliseconds: 160),
+                    curve: Curves.easeOutBack,
+                    child: Icon(
+                      Icons.check_rounded,
+                      size: 15,
+                      color: theme.colorScheme.onPrimary,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -449,7 +481,7 @@ class _DefaultsCard extends StatelessWidget {
     return Container(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: AppTheme.borderOf(context)),
         boxShadow: AppTheme.softShadow(context),
       ),
@@ -563,11 +595,11 @@ class _BottomActionBar extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           PremiumConfirmButton(
-            label: 'Accept & Continue',
+            label: 'Acknowledge & Continue',
             enabled: enabled,
             hintWhenDisabled: acceptedCount == 0
-                ? 'Accept all three agreements to continue'
-                : 'Accept the remaining agreement${3 - acceptedCount == 1 ? '' : 's'}',
+                ? 'Acknowledge all 3 items to continue'
+                : 'Acknowledge the remaining item${3 - acceptedCount == 1 ? '' : 's'}',
             icon: Icons.arrow_forward_rounded,
             onPressed: enabled
                 ? () => Navigator.pushReplacement(

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 
-/// Animated brand splash shown after the native splash is removed.
+/// Premium, transportation-focused splash screen for Byahe Meter.
 class PremiumSplashView extends StatelessWidget {
   final AnimationController controller;
 
@@ -15,28 +15,26 @@ class PremiumSplashView extends StatelessWidget {
     final muted = AppTheme.mutedOf(context);
     final primary = theme.colorScheme.primary;
 
-    final fade = CurvedAnimation(
+    final logoFade = CurvedAnimation(
       parent: controller,
-      curve: const Interval(0.0, 0.55, curve: Curves.easeOutCubic),
+      curve: const Interval(0.0, 0.45, curve: Curves.easeOutCubic),
     );
-    final rise = Tween<Offset>(
-      begin: const Offset(0, 0.06),
-      end: Offset.zero,
-    ).animate(
+
+    final logoScale = Tween<double>(begin: 0.90, end: 1.0).animate(
       CurvedAnimation(
         parent: controller,
-        curve: const Interval(0.05, 0.65, curve: Curves.easeOutCubic),
+        curve: const Interval(0.0, 0.50, curve: Curves.easeOutBack),
       ),
     );
-    final logoScale = Tween<double>(begin: 0.92, end: 1.0).animate(
-      CurvedAnimation(
-        parent: controller,
-        curve: const Interval(0.0, 0.6, curve: Curves.easeOutBack),
-      ),
-    );
-    final bar = CurvedAnimation(
+
+    final routeLineAnim = CurvedAnimation(
       parent: controller,
-      curve: const Interval(0.35, 1.0, curve: Curves.easeInOutCubic),
+      curve: const Interval(0.25, 0.75, curve: Curves.easeInOutCubic),
+    );
+
+    final textFade = CurvedAnimation(
+      parent: controller,
+      curve: const Interval(0.40, 0.85, curve: Curves.easeOutCubic),
     );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
@@ -49,122 +47,140 @@ class PremiumSplashView extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            // Soft atmospheric fields — restrained, no rainbow.
+            // Soft background glow fields
             Positioned(
-              top: -120,
-              left: -80,
+              top: -100,
+              left: -60,
               child: _GlowOrb(
-                size: 280,
-                color: primary.withValues(alpha: isDark ? 0.14 : 0.10),
+                size: 260,
+                color: primary.withValues(alpha: isDark ? 0.12 : 0.08),
               ),
             ),
             Positioned(
-              bottom: -140,
-              right: -100,
+              bottom: -120,
+              right: -80,
               child: _GlowOrb(
-                size: 320,
-                color: primary.withValues(alpha: isDark ? 0.10 : 0.07),
+                size: 300,
+                color: primary.withValues(alpha: isDark ? 0.09 : 0.05),
               ),
             ),
+
             SafeArea(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(28, 24, 28, 32),
+                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
                 child: Column(
                   children: [
                     const Spacer(flex: 3),
+
+                    // Logo & App Name
                     FadeTransition(
-                      opacity: fade,
-                      child: SlideTransition(
-                        position: rise,
+                      opacity: logoFade,
+                      child: ScaleTransition(
+                        scale: logoScale,
                         child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            ScaleTransition(
-                              scale: logoScale,
-                              child: Hero(
-                                tag: 'biyahemeter-logo',
-                                child: Container(
-                                  padding: const EdgeInsets.all(22),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.surface
-                                        .withValues(alpha: 0.92),
-                                    borderRadius: BorderRadius.circular(28),
-                                    border: Border.all(
-                                      color: AppTheme.borderOf(context),
-                                    ),
-                                    boxShadow: AppTheme.softShadow(context),
-                                  ),
-                                  child: Image.asset(
-                                    'assets/images/logo.png',
-                                    height: 88,
-                                    fit: BoxFit.contain,
-                                  ),
+                            Container(
+                              padding: const EdgeInsets.all(20),
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.surface
+                                    .withValues(alpha: 0.94),
+                                borderRadius: BorderRadius.circular(26),
+                                border: Border.all(
+                                  color: AppTheme.borderOf(context),
                                 ),
+                                boxShadow: AppTheme.softShadow(context),
+                              ),
+                              child: Image.asset(
+                                'assets/images/logo.png',
+                                height: 82,
+                                fit: BoxFit.contain,
                               ),
                             ),
-                            const SizedBox(height: 28),
+                            const SizedBox(height: 24),
                             Text(
-                              'BiyaheMeter',
+                              'BYAHE METER',
                               textAlign: TextAlign.center,
                               style: theme.textTheme.headlineLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.8,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              'PH',
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.titleMedium?.copyWith(
-                                color: primary,
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: 4,
-                              ),
-                            ),
-                            const SizedBox(height: 14),
-                            Text(
-                              'Premium taxi meter for Filipino drivers',
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                color: muted,
-                                height: 1.4,
+                                fontWeight: FontWeight.w900,
+                                letterSpacing: 1.2,
+                                fontSize: 24,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const Spacer(flex: 4),
+
+                    const SizedBox(height: 20),
+
+                    // Minimal Vector Route Line Graphic
+                    SizedBox(
+                      height: 40,
+                      width: 180,
+                      child: AnimatedBuilder(
+                        animation: routeLineAnim,
+                        builder: (context, child) {
+                          return CustomPaint(
+                            painter: _RouteLinePainter(
+                              progress: routeLineAnim.value,
+                              color: primary,
+                              dotColor: theme.colorScheme.onSurface,
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+
+                    const SizedBox(height: 16),
+
+                    // Tagline
                     FadeTransition(
-                      opacity: fade,
+                      opacity: textFade,
                       child: Column(
                         children: [
-                          ClipRRect(
-                            borderRadius: BorderRadius.circular(99),
-                            child: SizedBox(
-                              width: 120,
-                              height: 3,
-                              child: AnimatedBuilder(
-                                animation: bar,
-                                builder: (context, _) {
-                                  return LinearProgressIndicator(
-                                    value: 0.15 + (bar.value * 0.85),
-                                    backgroundColor: AppTheme.borderOf(context),
-                                    color: primary,
-                                    minHeight: 3,
-                                  );
-                                },
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 14),
                           Text(
-                            'Preparing your meter…',
-                            style: theme.textTheme.labelMedium?.copyWith(
-                              color: muted,
+                            'Know your fare. Plan your byahe.',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w700,
+                              color: primary,
                               letterSpacing: 0.2,
                             ),
                           ),
+                          const SizedBox(height: 6),
+                          Text(
+                            'PH DRIVER & TRAVEL COMPANION',
+                            textAlign: TextAlign.center,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: muted,
+                              letterSpacing: 1.8,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 10,
+                            ),
+                          ),
                         ],
+                      ),
+                    ),
+
+                    const Spacer(flex: 4),
+
+                    // Subtle loading dots indicator
+                    FadeTransition(
+                      opacity: textFade,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(3, (index) {
+                          return Container(
+                            width: 6,
+                            height: 6,
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: primary.withValues(alpha: 0.3 + (index * 0.3)),
+                            ),
+                          );
+                        }),
                       ),
                     ),
                   ],
@@ -175,6 +191,65 @@ class PremiumSplashView extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+class _RouteLinePainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final Color dotColor;
+
+  _RouteLinePainter({
+    required this.progress,
+    required this.color,
+    required this.dotColor,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.85)
+      ..strokeWidth = 2.5
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    final path = Path();
+    path.moveTo(10, size.height / 2);
+    path.cubicTo(
+      size.width * 0.35,
+      10,
+      size.width * 0.65,
+      size.height - 10,
+      size.width - 10,
+      size.height / 2,
+    );
+
+    // Draw animated route line
+    final pathMetrics = path.computeMetrics().first;
+    final extractPath =
+        pathMetrics.extractPath(0.0, pathMetrics.length * progress);
+    canvas.drawPath(extractPath, paint);
+
+    // Draw origin dot
+    if (progress > 0.05) {
+      final startPaint = Paint()..color = color;
+      canvas.drawCircle(Offset(10, size.height / 2), 4.0, startPaint);
+    }
+
+    // Draw destination pin dot
+    if (progress > 0.90) {
+      final endPaint = Paint()..color = color;
+      final endWhite = Paint()..color = Colors.white;
+      canvas.drawCircle(
+          Offset(size.width - 10, size.height / 2), 5.5, endPaint);
+      canvas.drawCircle(
+          Offset(size.width - 10, size.height / 2), 2.5, endWhite);
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _RouteLinePainter oldDelegate) {
+    return oldDelegate.progress != progress;
   }
 }
 
