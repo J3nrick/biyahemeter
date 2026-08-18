@@ -12,7 +12,6 @@ import 'package:biyahe_meter/features/history/history_provider.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_screen.dart';
-import 'package:biyahe_meter/features/onboarding/premium_splash_view.dart';
 import 'package:biyahe_meter/services/analytics_service.dart';
 import 'package:biyahe_meter/services/history_service.dart';
 import 'package:biyahe_meter/services/map_cache_service.dart';
@@ -20,9 +19,10 @@ import 'package:biyahe_meter/services/receipt_service.dart';
 import 'package:biyahe_meter/services/sos_service.dart';
 
 Future<void> main() async {
-  final WidgetsBinding widgetsBinding =
-      WidgetsFlutterBinding.ensureInitialized();
-  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  WidgetsFlutterBinding.ensureInitialized();
+  try {
+    FlutterNativeSplash.remove();
+  } catch (_) {}
 
   await Hive.initFlutter();
 
@@ -32,7 +32,7 @@ Future<void> main() async {
   final meter = MeterProvider()..applyFareMatrix(fareMatrix);
   final historyProvider = HistoryProvider(historyService, AnalyticsService());
 
-  // Kick off non-blocking init — do not delay first frame / splash handoff.
+  // Kick off non-blocking init in background
   Future<void> warmUp() async {
     try {
       await historyService.init();
@@ -44,6 +44,12 @@ Future<void> main() async {
   }
 
   warmUp();
+
+  if (!kIsWeb) {
+    try {
+      Permission.locationWhenInUse.request();
+    } catch (_) {}
+  }
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
@@ -111,96 +117,11 @@ class BiyaheMeterApp extends StatelessWidget {
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
               themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
-              home: const _SplashGate(),
+              home: const AgreementsScreen(),
             ),
           );
         },
       ),
-    );
-  }
-}
-
-/// Native/HTML splash → premium animated intro → agreements.
-class _SplashGate extends StatefulWidget {
-  const _SplashGate();
-
-  @override
-  State<_SplashGate> createState() => _SplashGateState();
-}
-
-class _SplashGateState extends State<_SplashGate>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _intro;
-  bool _showAgreements = false;
-  bool _nativeSplashRemoved = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _intro = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    )..forward();
-
-    WidgetsBinding.instance.addPostFrameCallback((_) async {
-      _removeNativeSplash();
-
-      final minDelay = Future.delayed(const Duration(milliseconds: 2000));
-      try {
-        if (!kIsWeb) {
-          try {
-            await Permission.locationWhenInUse.request();
-          } catch (_) {}
-        }
-        await minDelay;
-      } catch (_) {
-        // Keep splash→agreements handoff even if permission/delay fails.
-      }
-
-      _removeNativeSplash();
-      if (!mounted) return;
-      setState(() => _showAgreements = true);
-    });
-  }
-
-  void _removeNativeSplash() {
-    if (_nativeSplashRemoved) return;
-    _nativeSplashRemoved = true;
-    try {
-      FlutterNativeSplash.remove();
-    } catch (_) {}
-  }
-
-  @override
-  void dispose() {
-    _intro.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 520),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
-      transitionBuilder: (child, animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: SlideTransition(
-            position: Tween<Offset>(
-              begin: const Offset(0, 0.02),
-              end: Offset.zero,
-            ).animate(animation),
-            child: child,
-          ),
-        );
-      },
-      child: _showAgreements
-          ? const AgreementsScreen(key: ValueKey('agreements'))
-          : PremiumSplashView(
-              key: const ValueKey('splash'),
-              controller: _intro,
-            ),
     );
   }
 }
