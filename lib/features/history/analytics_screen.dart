@@ -134,12 +134,15 @@ class AnalyticsScreen extends StatelessWidget {
                 return Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Material(
-                    color: theme.colorScheme.surface,
-                    borderRadius: BorderRadius.circular(16),
+                    color: theme.colorScheme.surface.withValues(alpha: 0.82),
+                    borderRadius: BorderRadius.circular(18),
                     child: ListTile(
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                        side: BorderSide(color: AppTheme.borderOf(context)),
+                        borderRadius: BorderRadius.circular(18),
+                        side: BorderSide(
+                          color: AppTheme.borderOf(context).withValues(alpha: 0.5),
+                          width: 0.8,
+                        ),
                       ),
                       title: Text(
                         money.format(trip.totalFare),
@@ -220,10 +223,12 @@ class _InsightCard extends StatelessWidget {
       width: double.infinity,
       padding: EdgeInsets.all(compact ? 14 : 16),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppTheme.borderOf(context)),
-        boxShadow: AppTheme.softShadow(context),
+        color: theme.colorScheme.surface.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppTheme.borderOf(context).withValues(alpha: 0.6),
+          width: 0.8,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,6 +243,7 @@ class _InsightCard extends StatelessWidget {
               style: theme.textTheme.headlineMedium?.copyWith(
                 fontWeight: FontWeight.w800,
                 letterSpacing: -0.6,
+                fontFeatures: const [FontFeature.tabularFigures()],
               ),
             ),
           ),

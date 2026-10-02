@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 
@@ -119,7 +120,7 @@ class AppTheme {
     );
   }
 
-  /// Orbitron for fare / meter numerals only.
+  /// Orbitron for fare / meter numerals with HIG tabular figures.
   static TextStyle fareStyle({
     required Brightness brightness,
     double fontSize = 40,
@@ -134,8 +135,10 @@ class AppTheme {
       letterSpacing: -0.8,
       height: 1.0,
       color: color ?? fallback,
+      fontFeatures: const [FontFeature.tabularFigures()],
     );
   }
+
 
   static Color successOf(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark

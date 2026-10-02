@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -122,18 +123,26 @@ class _Header extends StatelessWidget {
       children: [
         Hero(
           tag: 'biyahemeter-logo',
-          child: Container(
-            padding: EdgeInsets.all(isNarrow ? 14 : 16),
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface.withValues(alpha: 0.94),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppTheme.borderOf(context)),
-              boxShadow: AppTheme.softShadow(context),
-            ),
-            child: Image.asset(
-              'assets/images/logo.png',
-              height: isNarrow ? 68 : 80,
-              fit: BoxFit.contain,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(24),
+            child: BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+              child: Container(
+                padding: EdgeInsets.all(isNarrow ? 14 : 16),
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surface.withValues(alpha: 0.85),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: AppTheme.borderOf(context).withValues(alpha: 0.6),
+                    width: 0.8,
+                  ),
+                ),
+                child: Image.asset(
+                  'assets/images/logo.png',
+                  height: isNarrow ? 68 : 80,
+                  fit: BoxFit.contain,
+                ),
+              ),
             ),
           ),
         ),
@@ -142,8 +151,8 @@ class _Header extends StatelessWidget {
           'Welcome to Byahe Meter',
           textAlign: TextAlign.center,
           style: theme.textTheme.headlineLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.6,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.8,
           ),
         ),
         const SizedBox(height: 6),
@@ -181,10 +190,12 @@ class _ProgressPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppTheme.borderOf(context)),
-        boxShadow: AppTheme.softShadow(context),
+        color: theme.colorScheme.surface.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppTheme.borderOf(context).withValues(alpha: 0.6),
+          width: 0.8,
+        ),
       ),
       child: Row(
         children: [
@@ -234,9 +245,9 @@ class _ProgressPill extends StatelessWidget {
               onPressed: onAcceptAll,
               style: TextButton.styleFrom(
                 foregroundColor: primary,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                minimumSize: Size.zero,
-                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                minimumSize: const Size(44, 44),
+                alignment: Alignment.centerRight,
               ),
               child: const Text(
                 'Accept all',
@@ -289,10 +300,12 @@ class _AgreementsCard extends StatelessWidget {
 
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.borderOf(context)),
-        boxShadow: AppTheme.softShadow(context),
+        color: theme.colorScheme.surface.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: AppTheme.borderOf(context).withValues(alpha: 0.6),
+          width: 0.8,
+        ),
       ),
       child: Column(
         children: [
@@ -480,10 +493,12 @@ class _DefaultsCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppTheme.borderOf(context)),
-        boxShadow: AppTheme.softShadow(context),
+        color: theme.colorScheme.surface.withValues(alpha: 0.85),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: AppTheme.borderOf(context).withValues(alpha: 0.6),
+          width: 0.8,
+        ),
       ),
       child: Column(
         children: [
@@ -576,68 +591,69 @@ class _BottomActionBar extends StatelessWidget {
     final muted = AppTheme.mutedOf(context);
     final bottom = MediaQuery.paddingOf(context).bottom;
 
-    return Container(
-      padding: EdgeInsets.fromLTRB(20, 12, 20, bottom + 14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: 0.96),
-        border: Border(
-          top: BorderSide(color: AppTheme.borderOf(context)),
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 16,
-            offset: const Offset(0, -4),
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          padding: EdgeInsets.fromLTRB(20, 12, 20, bottom + 14),
+          decoration: BoxDecoration(
+            color: theme.colorScheme.surface.withValues(alpha: 0.82),
+            border: Border(
+              top: BorderSide(
+                color: AppTheme.borderOf(context).withValues(alpha: 0.5),
+                width: 0.8,
+              ),
+            ),
           ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          PremiumConfirmButton(
-            label: 'Acknowledge & Continue',
-            enabled: enabled,
-            hintWhenDisabled: acceptedCount == 0
-                ? 'Acknowledge all 3 items to continue'
-                : 'Acknowledge the remaining item${3 - acceptedCount == 1 ? '' : 's'}',
-            icon: Icons.arrow_forward_rounded,
-            onPressed: enabled
-                ? () => Navigator.pushReplacement(
-                      context,
-                      PageRouteBuilder(
-                        pageBuilder: (context, animation, secondaryAnimation) =>
-                            const HomeScreen(),
-                        transitionsBuilder: (context, animation,
-                                secondaryAnimation, child) =>
-                            FadeTransition(
-                          opacity: animation,
-                          child: SlideTransition(
-                            position: Tween<Offset>(
-                              begin: const Offset(0, 0.03),
-                              end: Offset.zero,
-                            ).animate(
-                              CurvedAnimation(
-                                parent: animation,
-                                curve: Curves.easeOutCubic,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PremiumConfirmButton(
+                label: 'Acknowledge & Continue',
+                enabled: enabled,
+                hintWhenDisabled: acceptedCount == 0
+                    ? 'Acknowledge all 3 items to continue'
+                    : 'Acknowledge the remaining item${3 - acceptedCount == 1 ? '' : 's'}',
+                icon: Icons.arrow_forward_rounded,
+                onPressed: enabled
+                    ? () => Navigator.pushReplacement(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder: (context, animation, secondaryAnimation) =>
+                                const HomeScreen(),
+                            transitionsBuilder: (context, animation,
+                                    secondaryAnimation, child) =>
+                                FadeTransition(
+                              opacity: animation,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(0, 0.03),
+                                  end: Offset.zero,
+                                ).animate(
+                                  CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeOutCubic,
+                                  ),
+                                ),
+                                child: child,
                               ),
                             ),
-                            child: child,
+                            transitionDuration: const Duration(milliseconds: 380),
                           ),
-                        ),
-                        transitionDuration: const Duration(milliseconds: 380),
-                      ),
-                    )
-                : null,
+                        )
+                    : null,
+              ),
+              if (enabled) ...[
+                const SizedBox(height: 8),
+                Text(
+                  'You can update fare settings anytime from the dashboard.',
+                  textAlign: TextAlign.center,
+                  style: theme.textTheme.labelSmall?.copyWith(color: muted),
+                ),
+              ],
+            ],
           ),
-          if (enabled) ...[
-            const SizedBox(height: 8),
-            Text(
-              'You can update fare settings anytime from the dashboard.',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.labelSmall?.copyWith(color: muted),
-            ),
-          ],
-        ],
+        ),
       ),
     );
   }

@@ -41,8 +41,7 @@ class GlassCard extends StatelessWidget {
           decoration: BoxDecoration(
             color: fill,
             borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: border, width: 1),
-            boxShadow: AppTheme.softShadow(context),
+            border: Border.all(color: border, width: 0.8),
           ),
           child: child,
         ),
@@ -94,12 +93,14 @@ class MetricCard extends StatelessWidget {
         constraints: const BoxConstraints(minHeight: 112),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface,
+          color: theme.colorScheme.surface.withValues(
+            alpha: theme.brightness == Brightness.dark ? 0.72 : 0.85,
+          ),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: AppTheme.borderOf(context).withValues(alpha: 0.85),
+            color: AppTheme.borderOf(context).withValues(alpha: 0.6),
+            width: 0.8,
           ),
-          boxShadow: AppTheme.softShadow(context),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -136,6 +137,7 @@ class MetricCard extends StatelessWidget {
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.6,
                   height: 1,
+                  fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
             ),

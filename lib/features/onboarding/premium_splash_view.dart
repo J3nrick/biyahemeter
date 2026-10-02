@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 
@@ -23,7 +25,7 @@ class PremiumSplashView extends StatelessWidget {
     final logoScale = Tween<double>(begin: 0.90, end: 1.0).animate(
       CurvedAnimation(
         parent: controller,
-        curve: const Interval(0.0, 0.50, curve: Curves.easeOutBack),
+        curve: const Interval(0.0, 0.60, curve: _CriticallyDampedSpringCurve()),
       ),
     );
 
@@ -80,21 +82,28 @@ class PremiumSplashView extends StatelessWidget {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.all(20),
-                              decoration: BoxDecoration(
-                                color: theme.colorScheme.surface
-                                    .withValues(alpha: 0.94),
-                                borderRadius: BorderRadius.circular(26),
-                                border: Border.all(
-                                  color: AppTheme.borderOf(context),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(28),
+                              child: BackdropFilter(
+                                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                                child: Container(
+                                  padding: const EdgeInsets.all(22),
+                                  decoration: BoxDecoration(
+                                    color: theme.colorScheme.surface
+                                        .withValues(alpha: isDark ? 0.72 : 0.85),
+                                    borderRadius: BorderRadius.circular(28),
+                                    border: Border.all(
+                                      color: AppTheme.borderOf(context)
+                                          .withValues(alpha: 0.6),
+                                      width: 0.8,
+                                    ),
+                                  ),
+                                  child: Image.asset(
+                                    'assets/images/logo.png',
+                                    height: 82,
+                                    fit: BoxFit.contain,
+                                  ),
                                 ),
-                                boxShadow: AppTheme.softShadow(context),
-                              ),
-                              child: Image.asset(
-                                'assets/images/logo.png',
-                                height: 82,
-                                fit: BoxFit.contain,
                               ),
                             ),
                             const SizedBox(height: 24),
@@ -102,9 +111,9 @@ class PremiumSplashView extends StatelessWidget {
                               'BYAHE METER',
                               textAlign: TextAlign.center,
                               style: theme.textTheme.headlineLarge?.copyWith(
-                                fontWeight: FontWeight.w900,
-                                letterSpacing: 1.2,
-                                fontSize: 24,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -0.4,
+                                fontSize: 25,
                               ),
                             ),
                           ],
@@ -274,4 +283,19 @@ class _GlowOrb extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Apple HIG critically damped spring simulation (damping ratio = 1.0, zero overshoot)
+class _CriticallyDampedSpringCurve extends Curve {
+  static final _simulation = SpringSimulation(
+    const SpringDescription(mass: 1.0, stiffness: 120.0, damping: 21.9),
+    0.0,
+    1.0,
+    0.0,
+  );
+
+  const _CriticallyDampedSpringCurve();
+
+  @override
+  double transformInternal(double t) => _simulation.x(t).clamp(0.0, 1.0);
 }

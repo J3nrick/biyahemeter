@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
@@ -75,17 +76,23 @@ class _TripSummarySheet extends StatelessWidget {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.82,
-          ),
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withValues(alpha: 0.97),
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: AppTheme.borderOf(context)),
-            boxShadow: AppTheme.softShadow(context),
-          ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(26),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+            child: Container(
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+              decoration: BoxDecoration(
+                color: theme.colorScheme.surface.withValues(alpha: 0.85),
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: AppTheme.borderOf(context).withValues(alpha: 0.6),
+                  width: 0.8,
+                ),
+              ),
           child: SingleChildScrollView(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -178,8 +185,12 @@ class _TripSummarySheet extends StatelessWidget {
           ),
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
+
+
 
   Widget _line(BuildContext context, String label, String value) {
     final muted = AppTheme.mutedOf(context);

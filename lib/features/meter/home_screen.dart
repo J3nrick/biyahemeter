@@ -323,9 +323,9 @@ class _TopStatusBar extends StatelessWidget {
                   .withValues(alpha: 0.78),
               borderRadius: BorderRadius.circular(18),
               border: Border.all(
-                color: AppTheme.borderOf(context).withValues(alpha: 0.7),
+                color: AppTheme.borderOf(context).withValues(alpha: 0.5),
+                width: 0.8,
               ),
-              boxShadow: AppTheme.softShadow(context),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -662,9 +662,9 @@ class _FareHeroCard extends StatelessWidget {
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.14),
+            color: Colors.white.withValues(alpha: 0.16),
+            width: 0.8,
           ),
-          boxShadow: AppTheme.softShadow(context),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
