@@ -12,6 +12,7 @@
 - Trip Summary Sheet (`trip_summary_sheet.dart`): wrapped in native frosted glass with 20px blur and translucent surface.
 - Driver Insights (`analytics_screen.dart`): refactored metric cards and trip list items to grouped translucent materials.
 - Live mobile application execution and hot reload confirmed running on `iPhone_17_Pro` virtual device (1206x2622 px @ 460 ppi, 19.5:9 display ratio, hole cutout).
+- Web release output compiled via `flutter build web --release` and pushed to `origin/main` for Vercel static serving.
 
 ## Known Issues / Bugs
 - None logged. All Flutter analysis and build checks passing with 0 errors.
