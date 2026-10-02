@@ -1,6 +1,7 @@
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 
 /// Soft glass / clay surface used by floating dashboard cards.
@@ -66,7 +67,7 @@ class GlassCard extends StatelessWidget {
 
 /// Metric tile: icon + label + large value + unit.
 class MetricCard extends StatelessWidget {
-  final IconData icon;
+  final dynamic icon;
   final String label;
   final String value;
   final String unit;
@@ -114,7 +115,11 @@ class MetricCard extends StatelessWidget {
                     color: accentColor.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(9),
                   ),
-                  child: Icon(icon, size: 14, color: accentColor),
+                  child: Center(
+                    child: icon is FaIconData
+                        ? FaIcon(icon as FaIconData, size: 14, color: accentColor)
+                        : Icon(icon as IconData, size: 14, color: accentColor),
+                  ),
                 ),
                 const SizedBox(width: 8),
                 Expanded(

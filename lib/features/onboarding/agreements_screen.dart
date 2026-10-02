@@ -528,7 +528,7 @@ class _DefaultsCard extends StatelessWidget {
 }
 
 class _DefaultRow extends StatelessWidget {
-  final IconData icon;
+  final FaIconData icon;
   final String label;
   final String value;
   final bool isFirst;

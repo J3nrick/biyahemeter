@@ -1397,7 +1397,7 @@ class _SettingsGroup extends StatelessWidget {
 }
 
 class _SettingsTile extends StatelessWidget {
-  final IconData icon;
+  final FaIconData icon;
   final String label;
   final String hint;
   final TextEditingController controller;
