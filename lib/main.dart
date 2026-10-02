@@ -145,11 +145,11 @@ class _SplashGateState extends State<_SplashGate>
     super.initState();
     _splashController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1600),
+      duration: const Duration(milliseconds: 2200),
     )..forward();
 
-    // After 1.6s animation completes, smoothly transition to AgreementsScreen
-    Future.delayed(const Duration(milliseconds: 1600), () {
+    // After splash animation completes, smoothly transition to AgreementsScreen
+    Future.delayed(const Duration(milliseconds: 2400), () {
       if (!mounted) return;
       setState(() => _showAgreements = true);
     });
@@ -164,14 +164,22 @@ class _SplashGateState extends State<_SplashGate>
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 500),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       transitionBuilder: (child, animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
+        // Splash fades out with subtle scale-down; agreements fades in
+        final isSplash = child.key == const ValueKey('splash');
+        if (isSplash) {
+          return FadeTransition(
+            opacity: animation,
+            child: ScaleTransition(
+              scale: Tween<double>(begin: 0.96, end: 1.0).animate(animation),
+              child: child,
+            ),
+          );
+        }
+        return FadeTransition(opacity: animation, child: child);
       },
       child: _showAgreements
           ? const AgreementsScreen(key: ValueKey('agreements'))

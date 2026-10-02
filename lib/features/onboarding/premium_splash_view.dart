@@ -4,280 +4,236 @@ import 'package:flutter/physics.dart';
 import 'package:flutter/services.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 
-/// Premium, transportation-focused splash screen for Byahe Meter.
-class PremiumSplashView extends StatelessWidget {
+/// Ultra-minimal premium splash.
+///
+/// Design philosophy: total restraint. No orbs, no particles, no pulsing
+/// circles. Just the brand mark, a wordmark, and a whisper-thin linear
+/// progress trace. Every element earns its pixel.
+class PremiumSplashView extends StatefulWidget {
   final AnimationController controller;
 
   const PremiumSplashView({super.key, required this.controller});
 
   @override
+  State<PremiumSplashView> createState() => _PremiumSplashViewState();
+}
+
+class _PremiumSplashViewState extends State<PremiumSplashView>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _progressController;
+
+  @override
+  void initState() {
+    super.initState();
+    // Thin progress trace — deliberate, unhurried fill.
+    _progressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    );
+    // Begin progress fill after logo settles (400ms delay).
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) _progressController.forward();
+    });
+  }
+
+  @override
+  void dispose() {
+    _progressController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final isDark = theme.brightness == Brightness.dark;
-    final muted = AppTheme.mutedOf(context);
     final primary = theme.colorScheme.primary;
+    final muted = AppTheme.mutedOf(context);
+    final onSurface = theme.colorScheme.onSurface;
 
-    final logoFade = CurvedAnimation(
-      parent: controller,
-      curve: const Interval(0.0, 0.45, curve: Curves.easeOutCubic),
+    // ── Entry choreography (driven by parent controller) ──
+
+    // 1. Logo: fade + critically-damped spring scale (0.94 → 1.0)
+    final logoOpacity = CurvedAnimation(
+      parent: widget.controller,
+      curve: const Interval(0.0, 0.35, curve: Curves.easeOut),
     );
-
-    final logoScale = Tween<double>(begin: 0.90, end: 1.0).animate(
+    final logoScale = Tween<double>(begin: 0.94, end: 1.0).animate(
       CurvedAnimation(
-        parent: controller,
-        curve: const Interval(0.0, 0.60, curve: _CriticallyDampedSpringCurve()),
+        parent: widget.controller,
+        curve: const Interval(0.0, 0.50, curve: _CriticalSpring()),
       ),
     );
 
-    final routeLineAnim = CurvedAnimation(
-      parent: controller,
-      curve: const Interval(0.25, 0.75, curve: Curves.easeInOutCubic),
+    // 2. Wordmark: fade + micro-slide (8pt up)
+    final wordOpacity = CurvedAnimation(
+      parent: widget.controller,
+      curve: const Interval(0.18, 0.50, curve: Curves.easeOut),
+    );
+    final wordSlide = Tween<Offset>(
+      begin: const Offset(0, 0.06),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: widget.controller,
+      curve: const Interval(0.18, 0.55, curve: Curves.easeOutCubic),
+    ));
+
+    // 3. Tagline: delayed, gentle fade only
+    final taglineOpacity = CurvedAnimation(
+      parent: widget.controller,
+      curve: const Interval(0.35, 0.70, curve: Curves.easeOut),
     );
 
-    final textFade = CurvedAnimation(
-      parent: controller,
-      curve: const Interval(0.40, 0.85, curve: Curves.easeOutCubic),
+    // 4. Bottom furniture (progress + version): late reveal
+    final bottomOpacity = CurvedAnimation(
+      parent: widget.controller,
+      curve: const Interval(0.45, 0.80, curve: Curves.easeOut),
     );
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+        systemNavigationBarColor: theme.scaffoldBackgroundColor,
       ),
       child: ColoredBox(
         color: theme.scaffoldBackgroundColor,
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Soft background glow fields
-            Positioned(
-              top: -100,
-              left: -60,
-              child: _GlowOrb(
-                size: 260,
-                color: primary.withValues(alpha: isDark ? 0.12 : 0.08),
-              ),
-            ),
-            Positioned(
-              bottom: -120,
-              right: -80,
-              child: _GlowOrb(
-                size: 300,
-                color: primary.withValues(alpha: isDark ? 0.09 : 0.05),
-              ),
-            ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 48),
+            child: Column(
+              children: [
+                // ── Top negative space ──
+                const Spacer(flex: 7),
 
-            SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 24),
-                child: Column(
-                  children: [
-                    const Spacer(flex: 3),
-
-                    // Logo & App Name
-                    FadeTransition(
-                      opacity: logoFade,
-                      child: ScaleTransition(
-                        scale: logoScale,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            ClipRRect(
-                              borderRadius: BorderRadius.circular(28),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                                child: Container(
-                                  padding: const EdgeInsets.all(22),
-                                  decoration: BoxDecoration(
-                                    color: theme.colorScheme.surface
-                                        .withValues(alpha: isDark ? 0.72 : 0.85),
-                                    borderRadius: BorderRadius.circular(28),
-                                    border: Border.all(
-                                      color: AppTheme.borderOf(context)
-                                          .withValues(alpha: 0.6),
-                                      width: 0.8,
-                                    ),
-                                  ),
-                                  child: Image.asset(
-                                    'assets/images/logo.png',
-                                    height: 82,
-                                    fit: BoxFit.contain,
-                                  ),
-                                ),
-                              ),
+                // ── Brand mark ──
+                FadeTransition(
+                  opacity: logoOpacity,
+                  child: ScaleTransition(
+                    scale: logoScale,
+                    child: Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.surface
+                            .withValues(alpha: isDark ? 0.60 : 0.95),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: onSurface.withValues(alpha: isDark ? 0.08 : 0.06),
+                          width: 0.5,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(19.5),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Image.asset(
+                              'assets/images/logo.png',
+                              fit: BoxFit.contain,
                             ),
-                            const SizedBox(height: 24),
-                            Text(
-                              'BYAHE METER',
-                              textAlign: TextAlign.center,
-                              style: theme.textTheme.headlineLarge?.copyWith(
-                                fontWeight: FontWeight.w800,
-                                letterSpacing: -0.4,
-                                fontSize: 25,
-                              ),
-                            ),
-                          ],
+                          ),
                         ),
                       ),
                     ),
-
-                    const SizedBox(height: 20),
-
-                    // Minimal Vector Route Line Graphic
-                    SizedBox(
-                      height: 40,
-                      width: 180,
-                      child: AnimatedBuilder(
-                        animation: routeLineAnim,
-                        builder: (context, child) {
-                          return CustomPaint(
-                            painter: _RouteLinePainter(
-                              progress: routeLineAnim.value,
-                              color: primary,
-                              dotColor: theme.colorScheme.onSurface,
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-
-                    const SizedBox(height: 16),
-
-                    // Tagline
-                    FadeTransition(
-                      opacity: textFade,
-                      child: Column(
-                        children: [
-                          Text(
-                            'Know your fare. Plan your byahe.',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w700,
-                              color: primary,
-                              letterSpacing: 0.2,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            'PH DRIVER & TRAVEL COMPANION',
-                            textAlign: TextAlign.center,
-                            style: theme.textTheme.labelSmall?.copyWith(
-                              color: muted,
-                              letterSpacing: 1.8,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 10,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                    const Spacer(flex: 4),
-
-                    // Subtle loading dots indicator
-                    FadeTransition(
-                      opacity: textFade,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: List.generate(3, (index) {
-                          return Container(
-                            width: 6,
-                            height: 6,
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: primary.withValues(alpha: 0.3 + (index * 0.3)),
-                            ),
-                          );
-                        }),
-                      ),
-                    ),
-                  ],
+                  ),
                 ),
-              ),
+
+                const SizedBox(height: 24),
+
+                // ── Wordmark ──
+                SlideTransition(
+                  position: wordSlide,
+                  child: FadeTransition(
+                    opacity: wordOpacity,
+                    child: Text(
+                      'BiyaheMeter',
+                      textAlign: TextAlign.center,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.5,
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 6),
+
+                // ── Tagline — one quiet line ──
+                FadeTransition(
+                  opacity: taglineOpacity,
+                  child: Text(
+                    'Know your fare. Plan your byahe.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: muted,
+                      letterSpacing: 0.1,
+                    ),
+                  ),
+                ),
+
+                // ── Bottom negative space ──
+                const Spacer(flex: 8),
+
+                // ── Linear progress trace ──
+                FadeTransition(
+                  opacity: bottomOpacity,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 40),
+                    child: AnimatedBuilder(
+                      animation: _progressController,
+                      builder: (context, _) {
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(1),
+                          child: SizedBox(
+                            height: 1.5,
+                            child: Stack(
+                              children: [
+                                // Track
+                                Container(
+                                  color: onSurface.withValues(
+                                      alpha: isDark ? 0.06 : 0.04),
+                                ),
+                                // Fill
+                                FractionallySizedBox(
+                                  widthFactor: _progressController.value,
+                                  alignment: Alignment.centerLeft,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(1),
+                                      color: primary.withValues(alpha: 0.50),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // ── Version trace ──
+                FadeTransition(
+                  opacity: bottomOpacity,
+                  child: Text(
+                    'v1.0',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: muted.withValues(alpha: 0.40),
+                      fontSize: 10,
+                      letterSpacing: 0.8,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+
+                SizedBox(
+                    height: MediaQuery.paddingOf(context).bottom + 20),
+              ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _RouteLinePainter extends CustomPainter {
-  final double progress;
-  final Color color;
-  final Color dotColor;
-
-  _RouteLinePainter({
-    required this.progress,
-    required this.color,
-    required this.dotColor,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = color.withValues(alpha: 0.85)
-      ..strokeWidth = 2.5
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    final path = Path();
-    path.moveTo(10, size.height / 2);
-    path.cubicTo(
-      size.width * 0.35,
-      10,
-      size.width * 0.65,
-      size.height - 10,
-      size.width - 10,
-      size.height / 2,
-    );
-
-    // Draw animated route line
-    final pathMetrics = path.computeMetrics().first;
-    final extractPath =
-        pathMetrics.extractPath(0.0, pathMetrics.length * progress);
-    canvas.drawPath(extractPath, paint);
-
-    // Draw origin dot
-    if (progress > 0.05) {
-      final startPaint = Paint()..color = color;
-      canvas.drawCircle(Offset(10, size.height / 2), 4.0, startPaint);
-    }
-
-    // Draw destination pin dot
-    if (progress > 0.90) {
-      final endPaint = Paint()..color = color;
-      final endWhite = Paint()..color = Colors.white;
-      canvas.drawCircle(
-          Offset(size.width - 10, size.height / 2), 5.5, endPaint);
-      canvas.drawCircle(
-          Offset(size.width - 10, size.height / 2), 2.5, endWhite);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _RouteLinePainter oldDelegate) {
-    return oldDelegate.progress != progress;
-  }
-}
-
-class _GlowOrb extends StatelessWidget {
-  final double size;
-  final Color color;
-
-  const _GlowOrb({required this.size, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return IgnorePointer(
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          gradient: RadialGradient(
-            colors: [color, color.withValues(alpha: 0)],
           ),
         ),
       ),
@@ -285,17 +241,19 @@ class _GlowOrb extends StatelessWidget {
   }
 }
 
-/// Apple HIG critically damped spring simulation (damping ratio = 1.0, zero overshoot)
-class _CriticallyDampedSpringCurve extends Curve {
-  static final _simulation = SpringSimulation(
+/// Critically damped spring (damping ratio ≈ 1.0). Zero overshoot, zero
+/// bounce — the object arrives and stops. This is how physical objects
+/// with intentional mass behave.
+class _CriticalSpring extends Curve {
+  static final _sim = SpringSimulation(
     const SpringDescription(mass: 1.0, stiffness: 120.0, damping: 21.9),
     0.0,
     1.0,
     0.0,
   );
 
-  const _CriticallyDampedSpringCurve();
+  const _CriticalSpring();
 
   @override
-  double transformInternal(double t) => _simulation.x(t).clamp(0.0, 1.0);
+  double transformInternal(double t) => _sim.x(t).clamp(0.0, 1.0);
 }
