@@ -11,7 +11,7 @@
 - Shared Surfaces (`glass_card.dart`): elevated `GlassCard` and `MetricCard` with translucent system materials, hairline borders, and `FontFeature.tabularFigures()`.
 - Trip Summary Sheet (`trip_summary_sheet.dart`): wrapped in native frosted glass with 20px blur and translucent surface.
 - Driver Insights (`analytics_screen.dart`): refactored metric cards and trip list items to grouped translucent materials.
-- Live mobile application execution and hot reload confirmed running on `Pixel_8_Pro` emulator.
+- Live mobile application execution and hot reload confirmed running on `iPhone_17_Pro` virtual device (1206x2622 px @ 460 ppi, 19.5:9 display ratio, hole cutout).
 
 ## Known Issues / Bugs
 - None logged. All Flutter analysis and build checks passing with 0 errors.

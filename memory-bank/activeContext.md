@@ -1,19 +1,19 @@
 # Active Context
 
 ## Current Focus
-Live mobile testing and device execution on local emulator.
+Live mobile testing and device execution on custom iPhone 17 Pro profile emulator.
 
 ## Recent Changes
-- Configured and launched native mobile emulator environment on macOS:
-  - Installed Android Emulator (v37.2.12) and Android 34 (`google_apis;arm64-v8a`) system image.
-  - Created and booted `Pixel_8_Pro` AVD with hardware acceleration on Apple Silicon.
-  - Resolved toolchain incompatibility by installing Adoptium Temurin OpenJDK 21 (`~/.jdks/jdk-21.0.12.1+1`).
-  - Fixed MapLibre GL controller/widget class casing in `lib/features/map/map_widget.dart` (`ml.MapLibreMapController`, `ml.MapLibreMap`).
-  - Upgraded `font_awesome_flutter` to `^11.0.0` for Flutter 3.47 compatibility and updated `_SettingsTile`, `_DefaultRow`, and `MetricCard` to accept `FaIconData`.
-  - Built `assembleDebug` APK and launched live on `Pixel_8_Pro` emulator (`emulator-5554`).
-  - Verified onboarding flow, location permissions, and live dashboard rendering with MapLibre vector map and Apple HIG frosted glass cards.
+- Configured and launched custom `iPhone_17_Pro` virtual device:
+  - Created AVD `iPhone_17_Pro` matching physical iPhone 16/17 Pro hardware specs: 1206x2622 px, 460 ppi, 19.5:9 display ratio, hole-punch display cutout overlay.
+  - Verified Flutter target recognizing device as `iPhone_17_Pro • iPhone 17 Pro • Apple • android`.
+  - Booted emulator daemon and confirmed 1206x2622 physical dimensions and 460 density.
+  - Deployed `biyahemeter` debug APK to the `iPhone_17_Pro` virtual device.
+  - Verified onboarding permissions flow, location grant, and live dashboard rendering with Apple HIG translucent materials and MapLibre map on the 19.5:9 screen.
+- Maintained toolchain compatibility with OpenJDK 21 and Flutter 3.47.
 
 ## Immediate Next Steps
+- Obtain user approval before pushing git commits to remote `origin/main`.
 - Verify continuous real-time GPS tracking and live fare matrix updates on emulator.
-- Test responsive layout behavior across tablet/desktop split view form factors.
+
 
