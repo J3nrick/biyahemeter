@@ -1,0 +1,88 @@
+# ==========================================
+# Google Antigravity Token Optimization File
+# ==========================================
+
+# 1. Version Control & IDE Settings
+# ------------------------------------------
+.git/
+.github/
+.vscode/
+.idea/
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# 2. Secrets & Environment Variables (Crucial for Safety)
+# ------------------------------------------
+.env
+.env.*
+*.pem
+*.key
+auth.json
+
+# 3. Node.js & Next.js
+# ------------------------------------------
+node_modules/
+.next/
+out/
+build/
+dist/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# 4. PHP Laravel
+# ------------------------------------------
+vendor/
+storage/logs/
+storage/framework/
+storage/debugbar/
+bootstrap/cache/
+public/build/
+public/hot/
+composer.lock
+*.sqlite
+*.sqlite-journal
+
+# 5. Flutter & Dart
+# ------------------------------------------
+.dart_tool/
+build/
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Flutter.podspec
+android/.gradle/
+android/app/build/
+android/app/src/main/assets/
+linux/flutter/ephemeral/
+windows/flutter/ephemeral/
+pubspec.lock
+*.log
+
+# 6. Media, Assets & Minified Files
+# ------------------------------------------
+# Binary assets and minified files waste context tokens
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.webp
+*.mp4
+*.mp3
+*.wav
+*.ttf
+*.otf
+*.woff
+*.woff2
+*.pdf
+*.zip
+*.tar.gz
+*.min.js
+*.min.css

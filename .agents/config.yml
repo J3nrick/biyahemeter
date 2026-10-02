@@ -1,0 +1,28 @@
+# Antigravity Workspace Permissions & Execution Guardrails
+permissions:
+  filesystem:
+    allowed_paths:
+      - "./lib"
+      - "./assets"
+      - "./test"
+      - "./memory-bank"
+      - "./.agents"
+    blocked_paths:
+      - "./node_modules"
+      - "./.env"
+      - "./.env.*"
+      - "./.git"
+      - "./build"
+      - "./ios/Pods"
+
+  shell:
+    deny_commands:
+      - "rm -rf"
+      - "rm -rf /"
+      - "Remove-Item -Recurse"
+      - "Set-ExecutionPolicy"
+    require_approval_for:
+      - "git push"
+      - "npm publish"
+      - "php artisan migrate:fresh"
+      - "flutter pub publish"
