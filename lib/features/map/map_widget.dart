@@ -1,12 +1,13 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:maplibre_gl/maplibre_gl.dart' as ml;
+import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
 
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/core/theme/theme_provider.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
+import 'package:biyahe_meter/services/map_cache_service.dart';
 import 'package:biyahe_meter/features/meter/widgets/premium_buttons.dart';
 
 class MapWidget extends StatefulWidget {
@@ -18,25 +19,25 @@ class MapWidget extends StatefulWidget {
 
 class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
   // Default center: Manila, Philippines
-  static const ml.LatLng _defaultCenter = ml.LatLng(14.5995, 120.9842);
+  static const LatLng _defaultCenter = LatLng(14.5995, 120.9842);
 
-  ml.MapLibreMapController? _mapController;
+  final MapController _mapController = MapController();
   MeterProvider? _meterProvider;
 
   /// Whether the map should automatically pan to follow the user.
   bool _isFollowing = true;
 
-  /// Location fetched once on startup (before a trip begins).
-  ml.LatLng? _initialPosition;
+  AnimationController? _cameraAnimationController;
 
-  ml.Line? _activeLine;
-  ml.Circle? _locationMarker;
+  /// Location fetched once on startup (before a trip begins).
+  LatLng? _initialPosition;
 
   @override
   void initState() {
     super.initState();
     _fetchInitialPosition();
 
+    // Attach provider listener after the first frame so context is ready.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _meterProvider = context.read<MeterProvider>();
@@ -47,9 +48,11 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
   @override
   void dispose() {
     _meterProvider?.removeListener(_onPositionUpdate);
+    _cameraAnimationController?.dispose();
     super.dispose();
   }
 
+  /// Silently get device location so the map starts centered on the user.
   Future<void> _fetchInitialPosition() async {
     try {
       final serviceEnabled = await Geolocator.isLocationServiceEnabled();
@@ -68,158 +71,168 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
       );
 
       if (!mounted) return;
-      final latlng = ml.LatLng(pos.latitude, pos.longitude);
+      final latlng = LatLng(pos.latitude, pos.longitude);
       setState(() => _initialPosition = latlng);
 
-      if (_mapController != null && _isFollowing) {
-        _mapController!.animateCamera(
-          ml.CameraUpdate.newLatLngZoom(latlng, 15.0),
-        );
-      }
-    } catch (_) {}
-  }
-
-  void _onPositionUpdate() {
-    if (!mounted || _mapController == null) return;
-    final pos = context.read<MeterProvider>().currentPosition;
-    if (pos != null) {
-      final target = ml.LatLng(pos.latitude, pos.longitude);
-      _updateLocationMarker(target);
       if (_isFollowing) {
-        _mapController!.animateCamera(
-          ml.CameraUpdate.newLatLng(target),
+        _mapController.move(
+          LatLng(latlng.latitude - _latOffsetForPanel(15.0), latlng.longitude),
+          15.0,
         );
       }
-    }
-    _updateRouteLine();
-  }
-
-  void _onMapCreated(ml.MapLibreMapController controller) {
-    _mapController = controller;
-    final pos = _meterProvider?.currentPosition;
-    if (pos != null) {
-      final target = ml.LatLng(pos.latitude, pos.longitude);
-      _updateLocationMarker(target);
-    } else if (_initialPosition != null) {
-      _updateLocationMarker(_initialPosition!);
+    } catch (_) {
+      // Location unavailable — map stays at default center.
     }
   }
 
-  void _updateLocationMarker(ml.LatLng position) {
-    if (_mapController == null) return;
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final primaryHex = _colorToHex(primaryColor);
-
-    if (_locationMarker == null) {
-      _mapController!
-          .addCircle(
-        ml.CircleOptions(
-          geometry: position,
-          circleColor: primaryHex,
-          circleRadius: 8.0,
-          circleStrokeColor: '#FFFFFF',
-          circleStrokeWidth: 3.0,
-        ),
-      )
-          .then((circle) {
-        _locationMarker = circle;
-      }).catchError((_) {});
-    } else {
-      _mapController!.updateCircle(
-        _locationMarker!,
-        ml.CircleOptions(geometry: position),
-      );
-    }
+  /// Returns a latitude delta (degrees) to shift the camera centre south so
+  /// the GPS dot appears in the visible map area above the bottom dashboard sheet.
+  double _latOffsetForPanel(double zoom) {
+    const pixelShift = 140.0;
+    final metersPerPixel =
+        40075016.686 / (256.0 * (1 << zoom.round().clamp(1, 22)));
+    return (pixelShift * metersPerPixel) / 111111.0;
   }
 
-  void _updateRouteLine() {
-    if (_mapController == null || _meterProvider == null) return;
-    final points = _meterProvider!.routePoints;
-    final primaryColor = Theme.of(context).colorScheme.primary;
-    final primaryHex = _colorToHex(primaryColor);
-
-    if (points.length < 2) {
-      if (_activeLine != null) {
-        _mapController!.removeLine(_activeLine!);
-        _activeLine = null;
-      }
-      return;
-    }
-
-    final mlPoints =
-        points.map((p) => ml.LatLng(p.latitude, p.longitude)).toList();
-
-    if (_activeLine == null) {
-      _mapController!
-          .addLine(
-        ml.LineOptions(
-          geometry: mlPoints,
-          lineColor: primaryHex,
-          lineWidth: 5.0,
-          lineOpacity: 0.9,
-        ),
-      )
-          .then((line) {
-        _activeLine = line;
-      }).catchError((_) {});
-    } else {
-      _mapController!.updateLine(
-        _activeLine!,
-        ml.LineOptions(geometry: mlPoints),
-      );
-    }
-  }
-
-  String _colorToHex(Color color) {
-    final int argb = color.toARGB32();
-    return '#${argb.toRadixString(16).padLeft(8, '0').substring(2)}';
-  }
-
-  void _recenter() {
+  /// Called whenever MeterProvider notifies — pans the map if following.
+  void _onPositionUpdate() {
+    if (!mounted) return;
     final pos = context.read<MeterProvider>().currentPosition;
-    final target = pos != null
-        ? ml.LatLng(pos.latitude, pos.longitude)
-        : (_initialPosition ?? _defaultCenter);
+    if (pos != null && _isFollowing) {
+      final zoom = _mapController.camera.zoom;
+      _mapController.move(
+        LatLng(pos.latitude - _latOffsetForPanel(zoom), pos.longitude),
+        zoom,
+      );
+    }
+  }
 
-    setState(() => _isFollowing = true);
-    _mapController?.animateCamera(
-      ml.CameraUpdate.newLatLngZoom(target, 15.0),
+  void _animateMapMove(LatLng target, double targetZoom) {
+    _cameraAnimationController?.dispose();
+    final startCenter = _mapController.camera.center;
+    final startZoom = _mapController.camera.zoom;
+
+    final latTween =
+        Tween<double>(begin: startCenter.latitude, end: target.latitude);
+    final lngTween =
+        Tween<double>(begin: startCenter.longitude, end: target.longitude);
+    final zoomTween = Tween<double>(begin: startZoom, end: targetZoom);
+
+    final controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
     );
+    _cameraAnimationController = controller;
+
+    final animation = CurvedAnimation(
+      parent: controller,
+      curve: Curves.easeOutCubic,
+    );
+
+    controller.addListener(() {
+      if (!mounted) return;
+      _mapController.move(
+        LatLng(
+          latTween.evaluate(animation),
+          lngTween.evaluate(animation),
+        ),
+        zoomTween.evaluate(animation),
+      );
+    });
+
+    controller.forward();
+  }
+
+  /// Re-enable auto-follow and snap smoothly back to current location.
+  void _recenter() {
+    final pos = context.read<MeterProvider>().currentPosition ??
+        _initialPosition ??
+        _defaultCenter;
+    setState(() => _isFollowing = true);
+    const zoom = 15.0;
+    final target =
+        LatLng(pos.latitude - _latOffsetForPanel(zoom), pos.longitude);
+    _animateMapMove(target, zoom);
   }
 
   @override
   Widget build(BuildContext context) {
+    final meter = context.watch<MeterProvider>();
     final isDarkMode = context.watch<ThemeProvider>().isDarkMode;
-    // MapLibre vector style with OpenStreetMap tiles
-    final styleString = isDarkMode
-        ? 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
-        : 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json';
-
-    final pos = context.watch<MeterProvider>().currentPosition;
-    final initialCenter = pos != null
-        ? ml.LatLng(pos.latitude, pos.longitude)
-        : (_initialPosition ?? _defaultCenter);
-
+    final mapCache = context.watch<MapCacheService>();
+    final markerPosition = meter.currentPosition ?? _initialPosition;
+    final initialCenter =
+        _initialPosition ?? meter.currentPosition ?? _defaultCenter;
     final topInset = MediaQuery.of(context).padding.top;
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        ml.MapLibreMap(
-          initialCameraPosition: ml.CameraPosition(
-            target: initialCenter,
-            zoom: 15.0,
+        FlutterMap(
+          mapController: _mapController,
+          options: MapOptions(
+            initialCenter: initialCenter,
+            initialZoom: 15.0,
+            minZoom: 3.0,
+            maxZoom: 19.0,
+            interactionOptions: const InteractionOptions(
+              flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+            ),
+            onPositionChanged: (camera, hasGesture) {
+              if (hasGesture && _isFollowing) {
+                setState(() => _isFollowing = false);
+              }
+            },
           ),
-          styleString: styleString,
-          onMapCreated: _onMapCreated,
-          onCameraTrackingDismissed: () {
-            if (_isFollowing) {
-              setState(() => _isFollowing = false);
-            }
-          },
-          trackCameraPosition: true,
-          myLocationEnabled: false,
-          compassEnabled: false,
+          children: [
+            // CartoDB tiles: dark-matter for dark mode, positron for light mode
+            TileLayer(
+              urlTemplate: isDarkMode
+                  ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+                  : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
+              subdomains: const ['a', 'b', 'c', 'd'],
+              userAgentPackageName: 'com.biyahemeter.app',
+              maxZoom: 19,
+              tileProvider: mapCache.createTileProvider(),
+            ),
+
+            // OpenStreetMap Attribution
+            RichAttributionWidget(
+              showFlutterMapAttribution: false,
+              attributions: [
+                TextSourceAttribution(
+                  '© OpenStreetMap, © CARTO',
+                  onTap: null,
+                ),
+              ],
+            ),
+
+            // Tracked route polyline
+            if (meter.routePoints.length >= 2)
+              PolylineLayer(
+                polylines: [
+                  Polyline(
+                    points: meter.routePoints,
+                    strokeWidth: 5.0,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ],
+              ),
+
+            // Live GPS marker puck
+            if (markerPosition != null)
+              MarkerLayer(
+                markers: [
+                  Marker(
+                    point: markerPosition,
+                    width: 36,
+                    height: 36,
+                    alignment: Alignment.center,
+                    child: _GpsPuck(isFollowing: _isFollowing),
+                  ),
+                ],
+              ),
+          ],
         ),
 
         // ── Right-side map controls: zoom + re-center ──
@@ -249,9 +262,9 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                         tooltip: 'Zoom in',
                         icon: Icons.add_rounded,
                         onPressed: () {
-                          _mapController?.animateCamera(
-                            ml.CameraUpdate.zoomIn(),
-                          );
+                          final currentZoom = _mapController.camera.zoom;
+                          final nextZoom = (currentZoom + 1.0).clamp(3.0, 19.0);
+                          _animateMapMove(_mapController.camera.center, nextZoom);
                         },
                       ),
                       const SizedBox(height: 6),
@@ -259,9 +272,9 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                         tooltip: 'Zoom out',
                         icon: Icons.remove_rounded,
                         onPressed: () {
-                          _mapController?.animateCamera(
-                            ml.CameraUpdate.zoomOut(),
-                          );
+                          final currentZoom = _mapController.camera.zoom;
+                          final nextZoom = (currentZoom - 1.0).clamp(3.0, 19.0);
+                          _animateMapMove(_mapController.camera.center, nextZoom);
                         },
                       ),
                     ],
@@ -393,5 +406,90 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     if (confirmed == true && context.mounted) {
       context.read<MeterProvider>().resetTrip();
     }
+  }
+}
+
+/// Pulsing GPS location puck with smooth breathing radar halo.
+class _GpsPuck extends StatefulWidget {
+  final bool isFollowing;
+
+  const _GpsPuck({required this.isFollowing});
+
+  @override
+  State<_GpsPuck> createState() => _GpsPuckState();
+}
+
+class _GpsPuckState extends State<_GpsPuck>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulseController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulseController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _pulseController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final primaryColor = Theme.of(context).colorScheme.primary;
+
+    return AnimatedBuilder(
+      animation: _pulseController,
+      builder: (context, child) {
+        final progress = _pulseController.value;
+        final waveRadius = 14.0 + (progress * 16.0);
+        final waveOpacity = (1.0 - progress).clamp(0.0, 1.0) * 0.45;
+
+        return Center(
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Outer pulsing radar wave (when following)
+              if (widget.isFollowing)
+                Container(
+                  width: waveRadius * 2,
+                  height: waveRadius * 2,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: primaryColor.withValues(alpha: waveOpacity),
+                  ),
+                ),
+
+              // Crisp high-contrast location dot with white border & glow
+              Container(
+                width: 22,
+                height: 22,
+                decoration: BoxDecoration(
+                  color: primaryColor,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white, width: 3),
+                  boxShadow: [
+                    BoxShadow(
+                      color: primaryColor.withValues(alpha: 0.5),
+                      blurRadius: 10,
+                      spreadRadius: 2,
+                    ),
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.25),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
