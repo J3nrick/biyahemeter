@@ -135,57 +135,27 @@ class _SplashGate extends StatefulWidget {
   State<_SplashGate> createState() => _SplashGateState();
 }
 
-class _SplashGateState extends State<_SplashGate>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _splashController;
+class _SplashGateState extends State<_SplashGate> {
   bool _showAgreements = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _splashController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..forward();
-
-    // After splash animation completes, smoothly transition to AgreementsScreen
-    Future.delayed(const Duration(milliseconds: 2400), () {
-      if (!mounted) return;
-      setState(() => _showAgreements = true);
-    });
-  }
-
-  @override
-  void dispose() {
-    _splashController.dispose();
-    super.dispose();
-  }
 
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 500),
+      duration: const Duration(milliseconds: 400),
       switchInCurve: Curves.easeOutCubic,
       switchOutCurve: Curves.easeInCubic,
       transitionBuilder: (child, animation) {
-        // Splash fades out with subtle scale-down; agreements fades in
-        final isSplash = child.key == const ValueKey('splash');
-        if (isSplash) {
-          return FadeTransition(
-            opacity: animation,
-            child: ScaleTransition(
-              scale: Tween<double>(begin: 0.96, end: 1.0).animate(animation),
-              child: child,
-            ),
-          );
-        }
         return FadeTransition(opacity: animation, child: child);
       },
       child: _showAgreements
           ? const AgreementsScreen(key: ValueKey('agreements'))
-          : PremiumSplashView(
+          : SplashScreen(
               key: const ValueKey('splash'),
-              controller: _splashController,
+              onFinish: () {
+                if (mounted) {
+                  setState(() => _showAgreements = true);
+                }
+              },
             ),
     );
   }

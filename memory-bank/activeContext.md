@@ -4,14 +4,11 @@
 Vercel deployment verification and live mobile testing.
 
 ## Recent Changes
-- Recompiled and shipped web release bundle to `build/web`:
-  - Identified root cause of Vercel not updating: Vercel does not build Flutter in CI (`buildCommand: ""` in `vercel.json`), serving precompiled assets from `build/web`.
-  - Ran `flutter build web --release` to compile the new luxury splash screen, agreements screen, and Apple HIG components into `build/web/`.
-  - Committed as `585cbad` and pushed to `origin/main`.
-- Redesigned splash screen and agreements screen with luxury minimalism:
-  - Splash: stripped all AI-cliché orbs, pulse rings, breathing dots. Pure canvas with critically damped spring logo entry (0.94→1.0), wordmark, single tagline, and 1.5px linear progress trace.
-  - Agreements: iOS Settings-style grouped inset cards with 0.5pt hairline borders, inset dividers, outline Cupertino icons, full-width pill CTA with immediate scale-press feedback.
-  - SplashGate: 2.2s splash animation with scale-down crossfade transition to agreements.
+- Built synchronized SplashScreen and AgreementsScreen per user specifications:
+  - `SplashScreen`: Scaffold with deep transit blue gradient (`#071126` -> `#0A1838`), floating logo mark without container boxes, bold white "BiyaheMeter" wordmark, exact single tagline "Know your fare. Plan your byahe.", minimalist thin white CircularProgressIndicator, and exact 3.0s timer transition.
+  - `web/index.html`: Synchronized HTML pre-hydration loader with the exact same deep blue gradient, floating logo, typography, and spinner for zero visual flicker on web/Vercel.
+  - `AgreementsScreen`: "Before You Ride" header, animated LinearProgressIndicator with "X of 3 acknowledged" indicator, 3 elevated Cards with rounded corners & subtle shadows (Fare Estimates & Terms, Route & Data Privacy, Responsible Rate Use) with checkboxes on the right, subdued Trip Defaults configuration tile (12.0 km/L), and large sticky ElevatedButton disabled until all 3 are checked.
+  - Recompiled web release via `flutter build web --release` into `build/web/`. All checks passed with 0 analyzer issues.
 
 ## Immediate Next Steps
 - Verify Vercel deployment URL updates to display the new splash and agreements experience.

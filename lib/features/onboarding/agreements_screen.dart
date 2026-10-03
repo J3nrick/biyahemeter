@@ -1,20 +1,22 @@
-import 'dart:ui';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:provider/provider.dart';
 
-import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/features/meter/home_screen.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 
-/// Agreements / onboarding screen.
+/// Screen 2: Agreements Page (`AgreementsScreen`)
 ///
-/// Design: iOS Settings-style grouped inset lists on a clean canvas.
-/// No orbs, no decorative noise. Grouped translucent cards, inset
-/// dividers, full-width pill CTA. Every surface is earned.
+/// Features:
+/// - Clean top header reading "Before You Ride"
+/// - Animated LinearProgressIndicator with "X of 3 acknowledged" indicator
+/// - 3 mandatory legal/safety items in elevated Cards with rounded corners & subtle shadows
+///   (Checkboxes aligned to the right)
+/// - Subdued "Trip Defaults" configuration tile (visually distinct, not a checkbox)
+/// - Large sticky ElevatedButton at bottom, disabled until all 3 checkboxes are true
+/// - Helper text below: "Acknowledge all 3 items to continue."
+/// - Clean modular structure using standard setState with provider synchronization
 class AgreementsScreen extends StatefulWidget {
   const AgreementsScreen({super.key});
 
@@ -22,124 +24,478 @@ class AgreementsScreen extends StatefulWidget {
   State<AgreementsScreen> createState() => _AgreementsScreenState();
 }
 
-class _AgreementsScreenState extends State<AgreementsScreen>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _entry;
+class _AgreementsScreenState extends State<AgreementsScreen> {
+  bool _fareEstimatesAccepted = false;
+  bool _routePrivacyAccepted = false;
+  bool _responsibleRateAccepted = false;
+
+  int get _acknowledgedCount {
+    int count = 0;
+    if (_fareEstimatesAccepted) count++;
+    if (_routePrivacyAccepted) count++;
+    if (_responsibleRateAccepted) count++;
+    return count;
+  }
+
+  bool get _allAccepted => _acknowledgedCount == 3;
 
   @override
   void initState() {
     super.initState();
-    _entry = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 700),
-    )..forward();
+    // Sync initial state from provider if available
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      try {
+        final ag = Provider.of<AgreementsProvider>(context, listen: false);
+        if (ag.acceptedTerms || ag.acceptedPrivacy || ag.verifiedGasData) {
+          setState(() {
+            _fareEstimatesAccepted = ag.acceptedTerms;
+            _routePrivacyAccepted = ag.acceptedPrivacy;
+            _responsibleRateAccepted = ag.verifiedGasData;
+          });
+        }
+      } catch (_) {}
+    });
   }
 
-  @override
-  void dispose() {
-    _entry.dispose();
-    super.dispose();
+  void _syncToProvider() {
+    try {
+      final ag = Provider.of<AgreementsProvider>(context, listen: false);
+      ag.toggleTerms(_fareEstimatesAccepted);
+      ag.togglePrivacy(_routePrivacyAccepted);
+      ag.toggleGasData(_responsibleRateAccepted);
+    } catch (_) {}
+  }
+
+  void _onContinue() {
+    if (!_allAccepted) return;
+
+    try {
+      HapticFeedback.mediumImpact();
+    } catch (_) {}
+
+    try {
+      final ag = Provider.of<AgreementsProvider>(context, listen: false);
+      ag.acceptAll();
+    } catch (_) {}
+
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) =>
+            const HomeScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 350),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final ag = context.watch<AgreementsProvider>();
-    final meter = context.watch<MeterProvider>();
     final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
     final width = MediaQuery.sizeOf(context).width;
-    final horizontal = width >= 700 ? (width - 520) / 2 : 24.0;
+    final horizontalPadding = width >= 700 ? (width - 560) / 2 : 20.0;
 
-    final accepted = [ag.acceptedTerms, ag.acceptedPrivacy, ag.verifiedGasData]
-        .where((v) => v)
-        .length;
-
-    // ── Staggered intervals ──
-    final f1 = CurvedAnimation(
-        parent: _entry,
-        curve: const Interval(0.0, 0.40, curve: Curves.easeOut));
-    final s1 = _slideAnim(0.0, 0.45);
-    final f2 = CurvedAnimation(
-        parent: _entry,
-        curve: const Interval(0.10, 0.48, curve: Curves.easeOut));
-    final f3 = CurvedAnimation(
-        parent: _entry,
-        curve: const Interval(0.20, 0.58, curve: Curves.easeOut));
-    final s3 = _slideAnim(0.20, 0.62);
-    final f4 = CurvedAnimation(
-        parent: _entry,
-        curve: const Interval(0.32, 0.70, curve: Curves.easeOut));
-    final f5 = CurvedAnimation(
-        parent: _entry,
-        curve: const Interval(0.45, 0.85, curve: Curves.easeOut));
+    // Palette: Deep transit blues, crisp whites, subtle grays
+    const transitBlue = Color(0xFF2563EB);
+    final cardBg = isDark ? const Color(0xFF131F37) : Colors.white;
+    final cardBorder = isDark
+        ? Colors.white.withValues(alpha: 0.08)
+        : const Color(0xFFE2E8F0);
+    final progressBg =
+        isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
+    final subduedBg =
+        isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9);
 
     return Scaffold(
       backgroundColor: theme.scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
+            // Scrollable Content
             Expanded(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(horizontal, 28, horizontal, 20),
+                padding: EdgeInsets.fromLTRB(
+                  horizontalPadding,
+                  24,
+                  horizontalPadding,
+                  24,
+                ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    // ── Header ──
-                    SlideTransition(
-                      position: s1,
-                      child: FadeTransition(
-                        opacity: f1,
-                        child: _Header(),
+                    // ── Header & Progress ──
+                    const Text(
+                      'Before You Ride',
+                      style: TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: -0.6,
                       ),
                     ),
-                    const SizedBox(height: 28),
-
-                    // ── Progress ──
-                    FadeTransition(
-                      opacity: f2,
-                      child: _Progress(accepted: accepted, total: 3,
-                        onAcceptAll: ag.allAccepted
-                            ? null
-                            : () => context.read<AgreementsProvider>().acceptAll(),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Review and acknowledge key safety and fare policies before starting your trip.',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
+                        height: 1.35,
                       ),
                     ),
-                    const SizedBox(height: 28),
+                    const SizedBox(height: 20),
 
-                    // ── Agreements section ──
-                    SlideTransition(
-                      position: s3,
-                      child: FadeTransition(
-                        opacity: f3,
-                        child: _buildSection(
-                          context,
-                          label: 'SAFETY & USAGE',
-                          child: _AgreementsList(ag: ag),
+                    // Progress Section
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '$_acknowledgedCount of 3 acknowledged',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: _allAccepted
+                                ? transitBlue
+                                : (isDark
+                                    ? const Color(0xFF94A3B8)
+                                    : const Color(0xFF475569)),
+                          ),
+                        ),
+                        if (!_allAccepted)
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _fareEstimatesAccepted = true;
+                                _routePrivacyAccepted = true;
+                                _responsibleRateAccepted = true;
+                              });
+                              _syncToProvider();
+                              try {
+                                HapticFeedback.selectionClick();
+                              } catch (_) {}
+                            },
+                            child: const Text(
+                              'Acknowledge All',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: transitBlue,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // Animated LinearProgressIndicator
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(6),
+                      child: SizedBox(
+                        height: 6,
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween<double>(
+                            begin: 0.0,
+                            end: _acknowledgedCount / 3.0,
+                          ),
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOutCubic,
+                          builder: (context, value, _) {
+                            return LinearProgressIndicator(
+                              value: value,
+                              backgroundColor: progressBg,
+                              valueColor: const AlwaysStoppedAnimation<Color>(
+                                  transitBlue),
+                            );
+                          },
                         ),
                       ),
                     ),
-                    const SizedBox(height: 24),
 
-                    // ── Defaults section ──
-                    FadeTransition(
-                      opacity: f4,
-                      child: _buildSection(
-                        context,
-                        label: 'TRIP DEFAULTS',
-                        child: _DefaultsList(meter: meter),
+                    const SizedBox(height: 28),
+
+                    // ── Mandatory Items (Cards) ──
+                    Padding(
+                      padding: const EdgeInsets.only(left: 2, bottom: 10),
+                      child: Text(
+                        'MANDATORY POLICIES',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                          color: isDark
+                              ? const Color(0xFF64748B)
+                              : const Color(0xFF94A3B8),
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 16),
+
+                    // Card 1: Fare Estimates & Terms
+                    _AgreementCard(
+                      title: 'Fare Estimates & Terms',
+                      description:
+                          'Fare calculations follow standard rates based on distance and waiting time. Actual traffic conditions may vary.',
+                      icon: Icons.receipt_long_rounded,
+                      value: _fareEstimatesAccepted,
+                      cardBg: cardBg,
+                      cardBorder: cardBorder,
+                      transitBlue: transitBlue,
+                      onChanged: (val) {
+                        setState(() => _fareEstimatesAccepted = val ?? false);
+                        _syncToProvider();
+                      },
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Card 2: Route & Data Privacy
+                    _AgreementCard(
+                      title: 'Route & Data Privacy',
+                      description:
+                          'GPS location is accessed exclusively in real-time to compute accurate transit distance. No personal tracking data is stored.',
+                      icon: Icons.location_on_outlined,
+                      value: _routePrivacyAccepted,
+                      cardBg: cardBg,
+                      cardBorder: cardBorder,
+                      transitBlue: transitBlue,
+                      onChanged: (val) {
+                        setState(() => _routePrivacyAccepted = val ?? false);
+                        _syncToProvider();
+                      },
+                    ),
+
+                    const SizedBox(height: 12),
+
+                    // Card 3: Responsible Rate Use
+                    _AgreementCard(
+                      title: 'Responsible Rate Use',
+                      description:
+                          'Calculations serve as transparent fare estimates. Ensure adherence to official transport regulations during your ride.',
+                      icon: Icons.verified_user_outlined,
+                      value: _responsibleRateAccepted,
+                      cardBg: cardBg,
+                      cardBorder: cardBorder,
+                      transitBlue: transitBlue,
+                      onChanged: (val) {
+                        setState(
+                            () => _responsibleRateAccepted = val ?? false);
+                        _syncToProvider();
+                      },
+                    ),
+
+                    const SizedBox(height: 28),
+
+                    // ── Secondary Settings (Subdued Trip Defaults) ──
+                    Padding(
+                      padding: const EdgeInsets.only(left: 2, bottom: 10),
+                      child: Text(
+                        'TRIP DEFAULTS',
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.2,
+                          color: isDark
+                              ? const Color(0xFF64748B)
+                              : const Color(0xFF94A3B8),
+                        ),
+                      ),
+                    ),
+
+                    // Subdued configuration tile (visually distinct, not a legal checkbox)
+                    Consumer<MeterProvider?>(
+                      builder: (context, meter, _) {
+                        final kmPerL = meter?.kmPerLiter ?? 12.0;
+                        final gasPrice = meter?.gasPricePerLiter ?? 65.0;
+                        final baseFare = meter?.baseFare ?? 45.0;
+
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: subduedBg,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isDark
+                                  ? Colors.white.withValues(alpha: 0.05)
+                                  : const Color(0xFFE2E8F0),
+                              width: 1,
+                            ),
+                          ),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 14,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Container(
+                                    width: 36,
+                                    height: 36,
+                                    decoration: BoxDecoration(
+                                      color: isDark
+                                          ? const Color(0xFF1E293B)
+                                          : const Color(0xFFE2E8F0),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Icon(
+                                      Icons.tune_rounded,
+                                      size: 18,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF475569),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        const Text(
+                                          'Trip Configuration',
+                                          style: TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          'Default vehicle & fuel calculation metrics',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: isDark
+                                                ? const Color(0xFF94A3B8)
+                                                : const Color(0xFF64748B),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 12),
+                              const Divider(height: 1, thickness: 0.5),
+                              const SizedBox(height: 12),
+                              // Metrics row
+                              Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  _DefaultMetricPill(
+                                    label: 'Fuel Efficiency',
+                                    value: '${kmPerL.toStringAsFixed(1)} km/L',
+                                    isDark: isDark,
+                                  ),
+                                  _DefaultMetricPill(
+                                    label: 'Gas Price',
+                                    value: '₱${gasPrice.toStringAsFixed(2)}/L',
+                                    isDark: isDark,
+                                  ),
+                                  _DefaultMetricPill(
+                                    label: 'Base Fare',
+                                    value: '₱${baseFare.toStringAsFixed(2)}',
+                                    isDark: isDark,
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),
             ),
 
-            // ── Bottom bar ──
-            FadeTransition(
-              opacity: f5,
-              child: _BottomBar(
-                enabled: ag.allAccepted,
-                accepted: accepted,
+            // ── Sticky Call to Action at Bottom ──
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                horizontalPadding,
+                16,
+                horizontalPadding,
+                16,
+              ),
+              decoration: BoxDecoration(
+                color: theme.scaffoldBackgroundColor,
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                    blurRadius: 10,
+                    offset: const Offset(0, -4),
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Large ElevatedButton dynamically disabled until 3 items acknowledged
+                  SizedBox(
+                    width: double.infinity,
+                    height: 54,
+                    child: ElevatedButton(
+                      onPressed: _allAccepted ? _onContinue : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: transitBlue,
+                        disabledBackgroundColor: isDark
+                            ? const Color(0xFF1E293B)
+                            : const Color(0xFFE2E8F0),
+                        foregroundColor: Colors.white,
+                        disabledForegroundColor: isDark
+                            ? const Color(0xFF64748B)
+                            : const Color(0xFF94A3B8),
+                        elevation: _allAccepted ? 2 : 0,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Text(
+                            _allAccepted
+                                ? 'Continue to Meter'
+                                : 'Accept All to Continue',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          if (_allAccepted) ...[
+                            const SizedBox(width: 8),
+                            const Icon(Icons.arrow_forward_rounded, size: 20),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+
+                  // Helper text
+                  Text(
+                    _allAccepted
+                        ? 'All policies acknowledged — ready to ride.'
+                        : 'Acknowledge all 3 items to continue.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B),
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -147,341 +503,131 @@ class _AgreementsScreenState extends State<AgreementsScreen>
       ),
     );
   }
-
-  Animation<Offset> _slideAnim(double start, double end) {
-    return Tween<Offset>(
-      begin: const Offset(0, 0.04),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _entry,
-      curve: Interval(start, end, curve: Curves.easeOutCubic),
-    ));
-  }
-
-  Widget _buildSection(BuildContext ctx,
-      {required String label, required Widget child}) {
-    final theme = Theme.of(ctx);
-    final primary = theme.colorScheme.primary;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.only(left: 4, bottom: 8),
-          child: Text(
-            label,
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: primary.withValues(alpha: 0.70),
-              letterSpacing: 1.2,
-              fontWeight: FontWeight.w700,
-              fontSize: 11,
-            ),
-          ),
-        ),
-        child,
-      ],
-    );
-  }
 }
 
-// ═══════════════════════════════════════════════════════════════
-//  HEADER
-// ═══════════════════════════════════════════════════════════════
-
-class _Header extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final muted = AppTheme.mutedOf(context);
-    final onSurface = theme.colorScheme.onSurface;
-
-    return Column(
-      children: [
-        // Logo — small, restrained, no glow
-        Hero(
-          tag: 'biyahemeter-logo',
-          child: Container(
-            width: 56,
-            height: 56,
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface
-                  .withValues(alpha: isDark ? 0.60 : 0.95),
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(
-                color: onSurface.withValues(alpha: isDark ? 0.08 : 0.06),
-                width: 0.5,
-              ),
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(14.5),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-                child: Padding(
-                  padding: const EdgeInsets.all(12),
-                  child: Image.asset(
-                    'assets/images/logo.png',
-                    fit: BoxFit.contain,
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-
-        // Title — Large Title weight, tight tracking
-        Text(
-          'Before You Ride',
-          textAlign: TextAlign.center,
-          style: theme.textTheme.headlineLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-            letterSpacing: -0.8,
-            fontSize: 28,
-            height: 1.1,
-          ),
-        ),
-        const SizedBox(height: 8),
-
-        // Subtitle — crisp, one-line
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Text(
-            'Review and acknowledge these items to get started.',
-            textAlign: TextAlign.center,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: muted,
-              height: 1.4,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  PROGRESS
-// ═══════════════════════════════════════════════════════════════
-
-class _Progress extends StatelessWidget {
-  final int accepted;
-  final int total;
-  final VoidCallback? onAcceptAll;
-
-  const _Progress({
-    required this.accepted,
-    required this.total,
-    this.onAcceptAll,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final primary = theme.colorScheme.primary;
-    final muted = AppTheme.mutedOf(context);
-    final onSurface = theme.colorScheme.onSurface;
-    final done = accepted == total;
-    final frac = accepted / total;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(16, 14, 8, 14),
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: isDark ? 0.55 : 0.92),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: onSurface.withValues(alpha: isDark ? 0.07 : 0.05),
-          width: 0.5,
-        ),
-      ),
-      child: Column(
-        children: [
-          Row(
-            children: [
-              // Status icon
-              Icon(
-                done
-                    ? CupertinoIcons.checkmark_circle_fill
-                    : CupertinoIcons.circle,
-                size: 20,
-                color: done ? primary : muted.withValues(alpha: 0.45),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  done
-                      ? 'All set — you\'re ready.'
-                      : '$accepted of $total acknowledged',
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.w600,
-                    fontSize: 14,
-                  ),
-                ),
-              ),
-              if (onAcceptAll != null)
-                CupertinoButton(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  onPressed: onAcceptAll,
-                  child: Text(
-                    'Accept All',
-                    style: TextStyle(
-                      color: primary,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 13,
-                    ),
-                  ),
-                ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          // Thin progress bar
-          ClipRRect(
-            borderRadius: BorderRadius.circular(1.5),
-            child: SizedBox(
-              height: 3,
-              child: Stack(
-                children: [
-                  Container(color: onSurface.withValues(alpha: isDark ? 0.06 : 0.04)),
-                  AnimatedFractionallySizedBox(
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeOutCubic,
-                    widthFactor: frac,
-                    alignment: Alignment.centerLeft,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(1.5),
-                        color: primary.withValues(alpha: 0.65),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  AGREEMENTS LIST
-// ═══════════════════════════════════════════════════════════════
-
-class _AgreementsList extends StatelessWidget {
-  final AgreementsProvider ag;
-
-  const _AgreementsList({required this.ag});
-
-  @override
-  Widget build(BuildContext context) {
-    return _GroupedCard(
-      children: [
-        _AgreementRow(
-          icon: CupertinoIcons.doc_text,
-          title: 'Fare Estimates & Terms',
-          subtitle: 'Fares are estimates and may vary with traffic.',
-          value: ag.acceptedTerms,
-          onTap: () => context
-              .read<AgreementsProvider>()
-              .toggleTerms(!ag.acceptedTerms),
-        ),
-        _AgreementRow(
-          icon: CupertinoIcons.location,
-          title: 'Route & Data Privacy',
-          subtitle: 'Location for distance calculation. Data stays private.',
-          value: ag.acceptedPrivacy,
-          onTap: () => context
-              .read<AgreementsProvider>()
-              .togglePrivacy(!ag.acceptedPrivacy),
-        ),
-        _AgreementRow(
-          icon: CupertinoIcons.gauge,
-          title: 'Responsible Rate Use',
-          subtitle: 'Fuel prices are customizable guides for fair metering.',
-          value: ag.verifiedGasData,
-          onTap: () => context
-              .read<AgreementsProvider>()
-              .toggleGasData(!ag.verifiedGasData),
-        ),
-      ],
-    );
-  }
-}
-
-class _AgreementRow extends StatelessWidget {
-  final IconData icon;
+/// Elevated Card for each mandatory agreement item
+class _AgreementCard extends StatelessWidget {
   final String title;
-  final String subtitle;
+  final String description;
+  final IconData icon;
   final bool value;
-  final VoidCallback onTap;
+  final Color cardBg;
+  final Color cardBorder;
+  final Color transitBlue;
+  final ValueChanged<bool?> onChanged;
 
-  const _AgreementRow({
-    required this.icon,
+  const _AgreementCard({
     required this.title,
-    required this.subtitle,
+    required this.description,
+    required this.icon,
     required this.value,
-    required this.onTap,
+    required this.cardBg,
+    required this.cardBorder,
+    required this.transitBlue,
+    required this.onChanged,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
     final isDark = theme.brightness == Brightness.dark;
-    final muted = AppTheme.mutedOf(context);
 
-    return Material(
-      color: value
-          ? primary.withValues(alpha: isDark ? 0.05 : 0.025)
-          : Colors.transparent,
+    return Card(
+      elevation: value ? 2.5 : 1.0,
+      margin: EdgeInsets.zero,
+      color: cardBg,
+      shadowColor: Colors.black.withValues(alpha: 0.06),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: value ? transitBlue.withValues(alpha: 0.4) : cardBorder,
+          width: value ? 1.5 : 1.0,
+        ),
+      ),
       child: InkWell(
         onTap: () {
-          onTap();
-          try { HapticFeedback.selectionClick(); } catch (_) {}
+          onChanged(!value);
+          try {
+            HapticFeedback.selectionClick();
+          } catch (_) {}
         },
-        splashColor: primary.withValues(alpha: 0.04),
-        highlightColor: primary.withValues(alpha: 0.02),
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Icon — outline style, not filled
-              Padding(
-                padding: const EdgeInsets.only(top: 1),
-                child: Icon(icon, size: 18, color: primary.withValues(alpha: 0.70)),
+              // Icon with soft rounded background
+              Container(
+                width: 40,
+                height: 40,
+                margin: const EdgeInsets.only(top: 2),
+                decoration: BoxDecoration(
+                  color: value
+                      ? transitBlue.withValues(alpha: 0.12)
+                      : (isDark
+                          ? const Color(0xFF1E293B)
+                          : const Color(0xFFF1F5F9)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: value
+                      ? transitBlue
+                      : (isDark
+                          ? const Color(0xFF94A3B8)
+                          : const Color(0xFF64748B)),
+                ),
               ),
               const SizedBox(width: 14),
+
+              // Title and Description
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       title,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        fontSize: 14,
-                        height: 1.2,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: -0.2,
                       ),
                     ),
-                    const SizedBox(height: 2),
+                    const SizedBox(height: 4),
                     Text(
-                      subtitle,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: muted,
+                      description,
+                      style: TextStyle(
+                        fontSize: 12.5,
+                        color: isDark
+                            ? const Color(0xFF94A3B8)
+                            : const Color(0xFF64748B),
                         height: 1.35,
-                        fontSize: 12,
                       ),
                     ),
                   ],
                 ),
               ),
-              const SizedBox(width: 12),
-              // Checkbox — clean, no glow/shadow
-              Padding(
-                padding: const EdgeInsets.only(top: 1),
-                child: _Checkbox(value: value),
+
+              const SizedBox(width: 8),
+
+              // Checkbox aligned to the right
+              Transform.scale(
+                scale: 1.1,
+                child: Checkbox(
+                  value: value,
+                  activeColor: transitBlue,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(5),
+                  ),
+                  onChanged: (val) {
+                    onChanged(val);
+                    try {
+                      HapticFeedback.selectionClick();
+                    } catch (_) {}
+                  },
+                ),
               ),
             ],
           ),
@@ -491,322 +637,41 @@ class _AgreementRow extends StatelessWidget {
   }
 }
 
-class _Checkbox extends StatelessWidget {
-  final bool value;
-  const _Checkbox({required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final onSurface = theme.colorScheme.onSurface;
-    final isDark = theme.brightness == Brightness.dark;
-
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 200),
-      curve: Curves.easeOutCubic,
-      width: 22,
-      height: 22,
-      decoration: BoxDecoration(
-        color: value ? primary : Colors.transparent,
-        borderRadius: BorderRadius.circular(6),
-        border: Border.all(
-          color: value
-              ? primary
-              : onSurface.withValues(alpha: isDark ? 0.15 : 0.18),
-          width: value ? 0 : 1.5,
-        ),
-      ),
-      child: AnimatedScale(
-        scale: value ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 150),
-        curve: Curves.easeOutBack,
-        child: Icon(
-          Icons.check_rounded,
-          size: 14,
-          color: theme.colorScheme.onPrimary,
-        ),
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  DEFAULTS LIST
-// ═══════════════════════════════════════════════════════════════
-
-class _DefaultsList extends StatelessWidget {
-  final MeterProvider meter;
-
-  const _DefaultsList({required this.meter});
-
-  @override
-  Widget build(BuildContext context) {
-    return _GroupedCard(
-      children: [
-        _DefaultRow(
-          icon: FontAwesomeIcons.gasPump,
-          label: 'Fuel efficiency',
-          value: '${meter.kmPerLiter.toStringAsFixed(1)} km/L',
-        ),
-        _DefaultRow(
-          icon: FontAwesomeIcons.pesoSign,
-          label: 'Gas price',
-          value: '₱${meter.gasPricePerLiter.toStringAsFixed(2)}/L',
-        ),
-        _DefaultRow(
-          icon: FontAwesomeIcons.coins,
-          label: 'Base fare',
-          value: '₱${meter.baseFare.toStringAsFixed(0)}',
-        ),
-      ],
-    );
-  }
-}
-
-class _DefaultRow extends StatelessWidget {
-  final FaIconData icon;
+/// Compact metric pill for defaults display
+class _DefaultMetricPill extends StatelessWidget {
   final String label;
   final String value;
+  final bool isDark;
 
-  const _DefaultRow({
-    required this.icon,
+  const _DefaultMetricPill({
     required this.label,
     required this.value,
+    required this.isDark,
   });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
-      child: Row(
-        children: [
-          FaIcon(icon, size: 13, color: primary.withValues(alpha: 0.65)),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(label, style: theme.textTheme.bodyMedium),
-          ),
-          Text(
-            value,
-            style: theme.textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  GROUPED CARD (reusable iOS-style inset group)
-// ═══════════════════════════════════════════════════════════════
-
-class _GroupedCard extends StatelessWidget {
-  final List<Widget> children;
-
-  const _GroupedCard({required this.children});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-    final onSurface = theme.colorScheme.onSurface;
-
-    final divider = Padding(
-      padding: const EdgeInsets.only(left: 48),
-      child: Container(
-        height: 0.5,
-        color: onSurface.withValues(alpha: isDark ? 0.07 : 0.06),
-      ),
-    );
-
-    final items = <Widget>[];
-    for (int i = 0; i < children.length; i++) {
-      items.add(children[i]);
-      if (i < children.length - 1) items.add(divider);
-    }
-
-    return Container(
-      clipBehavior: Clip.antiAlias,
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface.withValues(alpha: isDark ? 0.55 : 0.92),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: onSurface.withValues(alpha: isDark ? 0.07 : 0.05),
-          width: 0.5,
-        ),
-      ),
-      child: Column(children: items),
-    );
-  }
-}
-
-// ═══════════════════════════════════════════════════════════════
-//  BOTTOM BAR
-// ═══════════════════════════════════════════════════════════════
-
-class _BottomBar extends StatelessWidget {
-  final bool enabled;
-  final int accepted;
-
-  const _BottomBar({required this.enabled, required this.accepted});
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
-    final muted = AppTheme.mutedOf(context);
-    final onSurface = theme.colorScheme.onSurface;
-    final bottom = MediaQuery.paddingOf(context).bottom;
-
-    return ClipRect(
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-        child: Container(
-          padding: EdgeInsets.fromLTRB(24, 12, 24, bottom + 14),
-          decoration: BoxDecoration(
-            color: theme.scaffoldBackgroundColor.withValues(alpha: isDark ? 0.80 : 0.88),
-            border: Border(
-              top: BorderSide(
-                color: onSurface.withValues(alpha: isDark ? 0.06 : 0.05),
-                width: 0.5,
-              ),
-            ),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // ── Full-width pill CTA ──
-              _PillButton(
-                label: 'Continue',
-                enabled: enabled,
-                onPressed: enabled
-                    ? () => Navigator.pushReplacement(
-                          context,
-                          PageRouteBuilder(
-                            pageBuilder: (context, a, _) => const HomeScreen(),
-                            transitionsBuilder: (context, a, _, child) =>
-                                FadeTransition(
-                              opacity: CurvedAnimation(
-                                parent: a,
-                                curve: Curves.easeOut,
-                              ),
-                              child: child,
-                            ),
-                            transitionDuration:
-                                const Duration(milliseconds: 350),
-                          ),
-                        )
-                    : null,
-              ),
-
-              // Hint text
-              AnimatedSize(
-                duration: const Duration(milliseconds: 200),
-                curve: Curves.easeOutCubic,
-                child: enabled
-                    ? Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: Text(
-                          'You can adjust settings anytime.',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: muted.withValues(alpha: 0.60),
-                            fontSize: 11,
-                          ),
-                        ),
-                      )
-                    : Padding(
-                        padding: const EdgeInsets.only(top: 10),
-                        child: Text(
-                          accepted == 0
-                              ? 'Acknowledge all 3 items to continue'
-                              : '${3 - accepted} remaining',
-                          textAlign: TextAlign.center,
-                          style: theme.textTheme.labelSmall?.copyWith(
-                            color: muted.withValues(alpha: 0.50),
-                            fontSize: 11,
-                          ),
-                        ),
-                      ),
-              ),
-            ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 11,
+            color: isDark ? const Color(0xFF64748B) : const Color(0xFF94A3B8),
+            fontWeight: FontWeight.w500,
           ),
         ),
-      ),
-    );
-  }
-}
-
-/// Full-width pill button — 52pt height, solid accent, immediate press
-/// feedback via scale. No gradient, no shadow circus.
-class _PillButton extends StatefulWidget {
-  final String label;
-  final bool enabled;
-  final VoidCallback? onPressed;
-
-  const _PillButton({
-    required this.label,
-    required this.enabled,
-    this.onPressed,
-  });
-
-  @override
-  State<_PillButton> createState() => _PillButtonState();
-}
-
-class _PillButtonState extends State<_PillButton> {
-  bool _pressed = false;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final primary = theme.colorScheme.primary;
-    final isDark = theme.brightness == Brightness.dark;
-    final muted = AppTheme.mutedOf(context);
-    final active = widget.enabled && widget.onPressed != null;
-
-    return GestureDetector(
-      onTapDown: active ? (_) => setState(() => _pressed = true) : null,
-      onTapUp: active
-          ? (_) {
-              setState(() => _pressed = false);
-              widget.onPressed?.call();
-              try { HapticFeedback.mediumImpact(); } catch (_) {}
-            }
-          : null,
-      onTapCancel: active ? () => setState(() => _pressed = false) : null,
-      child: AnimatedScale(
-        scale: _pressed ? 0.98 : 1.0,
-        duration: const Duration(milliseconds: 100),
-        curve: Curves.easeOut,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 250),
-          curve: Curves.easeOutCubic,
-          height: 52,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: active
-                ? primary
-                : theme.colorScheme.surfaceContainerHighest
-                    .withValues(alpha: isDark ? 0.50 : 0.80),
-            borderRadius: BorderRadius.circular(14),
-          ),
-          child: Text(
-            widget.label,
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: active ? theme.colorScheme.onPrimary : muted,
-              fontWeight: FontWeight.w700,
-            ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+            color: isDark ? Colors.white : const Color(0xFF0F172A),
           ),
         ),
-      ),
+      ],
     );
   }
 }
