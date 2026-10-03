@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import 'package:biyahe_meter/features/meter/home_screen.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
+import 'package:biyahe_meter/features/meter/widgets/premium_buttons.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 
 /// Screen 2: Agreements Page (`AgreementsScreen`)
@@ -375,36 +376,17 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Large ElevatedButton dynamically disabled until 3 items acknowledged
-                  SizedBox(
-                    width: double.infinity,
+                  // Premium interactive button dynamically enabled after 3 items acknowledged
+                  PremiumInteractiveButton(
+                    text: _allAccepted
+                        ? 'Continue to Meter'
+                        : 'Accept All to Continue',
+                    icon: _allAccepted ? Icons.arrow_forward_rounded : null,
+                    enabled: _allAccepted,
+                    onPressed: _allAccepted ? _onContinue : null,
+                    backgroundColor: transitBlue,
+                    maxWidth: 420,
                     height: 54,
-                    child: ElevatedButton(
-                      onPressed: _allAccepted ? _onContinue : null,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: transitBlue,
-                        disabledBackgroundColor: isDark
-                            ? const Color(0xFF1E293B)
-                            : const Color(0xFFE2E8F0),
-                        foregroundColor: Colors.white,
-                        disabledForegroundColor: isDark
-                            ? const Color(0xFF64748B)
-                            : const Color(0xFF94A3B8),
-                        elevation: _allAccepted ? 2 : 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      child: Text(
-                        _allAccepted
-                            ? 'Continue to Meter'
-                            : 'Accept All to Continue',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
                   ),
                   const SizedBox(height: 10),
 

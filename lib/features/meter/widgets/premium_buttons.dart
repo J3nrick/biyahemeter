@@ -41,6 +41,9 @@ class _PressableState extends State<Pressable> {
   void _setPressed(bool value) {
     if (!widget.enabled || _pressed == value) return;
     setState(() => _pressed = value);
+    if (value && !kIsWeb) {
+      HapticFeedback.lightImpact(); // Subtle vibration on press down
+    }
   }
 
   Future<void> _fireHaptic() async {
@@ -69,7 +72,7 @@ class _PressableState extends State<Pressable> {
       label: widget.semanticLabel,
       child: AnimatedScale(
         scale: _pressed && enabled ? widget.pressedScale : 1,
-        duration: const Duration(milliseconds: 120),
+        duration: const Duration(milliseconds: 140),
         curve: Curves.easeOutCubic,
         child: Material(
           color: Colors.transparent,
@@ -99,6 +102,178 @@ class _PressableState extends State<Pressable> {
       ),
     );
   }
+}
+
+/// Premium interactive button combining dual-stage touch feedback (lightImpact on
+/// press down, selectionClick on release), micro-animation physical depress scaling
+/// (95% scale + shadow collapse for a "pushed in" feel), and dynamic responsive layout constraints.
+class PremiumInteractiveButton extends StatefulWidget {
+  final String text;
+  final VoidCallback? onPressed;
+  final bool enabled;
+  final bool isLoading;
+  final IconData? icon;
+  final Widget? trailing;
+  final Color? backgroundColor;
+  final Color? textColor;
+  final double maxWidth;
+  final double height;
+  final BorderRadius? borderRadius;
+
+  const PremiumInteractiveButton({
+    super.key,
+    required this.text,
+    required this.onPressed,
+    this.enabled = true,
+    this.isLoading = false,
+    this.icon,
+    this.trailing,
+    this.backgroundColor,
+    this.textColor,
+    this.maxWidth = 420,
+    this.height = 54,
+    this.borderRadius,
+  });
+
+  @override
+  State<PremiumInteractiveButton> createState() =>
+      _PremiumInteractiveButtonState();
+}
+
+class _PremiumInteractiveButtonState extends State<PremiumInteractiveButton> {
+  bool _isPressed = false;
+
+  void _handleTapDown(TapDownDetails details) {
+    if (!widget.enabled || widget.isLoading) return;
+    setState(() => _isPressed = true);
+    if (!kIsWeb) {
+      HapticFeedback.lightImpact(); // Subtle vibration on press
+    }
+  }
+
+  void _handleTapUp(TapUpDetails details) {
+    if (!widget.enabled || widget.isLoading) return;
+    setState(() => _isPressed = false);
+    if (!kIsWeb) {
+      HapticFeedback.selectionClick(); // Distinct tactile feedback on release
+    }
+    widget.onPressed?.call();
+  }
+
+  void _handleTapCancel() {
+    if (_isPressed) {
+      setState(() => _isPressed = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final primary = widget.backgroundColor ?? theme.colorScheme.primary;
+    final enabled =
+        widget.enabled && !widget.isLoading && widget.onPressed != null;
+
+    final disabledBg = isDark
+        ? const Color(0xFF1E293B)
+        : const Color(0xFFE2E8F0);
+    final disabledFg = isDark
+        ? const Color(0xFF64748B)
+        : const Color(0xFF94A3B8);
+
+    final effectiveBg = enabled ? primary : disabledBg;
+    final effectiveFg =
+        enabled ? (widget.textColor ?? Colors.white) : disabledFg;
+
+    final br = widget.borderRadius ?? BorderRadius.circular(16);
+
+    return Center(
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxWidth: widget.maxWidth),
+        child: GestureDetector(
+          onTapDown: enabled ? _handleTapDown : null,
+          onTapUp: enabled ? _handleTapUp : null,
+          onTapCancel: enabled ? _handleTapCancel : null,
+          behavior: HitTestBehavior.opaque,
+          child: AnimatedScale(
+            scale: _isPressed && enabled ? 0.95 : 1.0,
+            duration: const Duration(milliseconds: 150),
+            curve: Curves.easeOutCubic,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              curve: Curves.easeOutCubic,
+              width: double.infinity, // Adapts to parent width up to maxWidth
+              height: widget.height,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              decoration: BoxDecoration(
+              color: enabled
+                  ? (_isPressed
+                      ? Color.lerp(primary, Colors.black, 0.14)
+                      : primary)
+                  : effectiveBg,
+              borderRadius: br,
+              border: Border.all(
+                color: enabled
+                    ? Colors.white.withValues(alpha: 0.18)
+                    : (isDark
+                        ? Colors.white.withValues(alpha: 0.05)
+                        : Colors.black.withValues(alpha: 0.05)),
+                width: 1,
+              ),
+              boxShadow: enabled && !_isPressed
+                  ? [
+                      BoxShadow(
+                        color: primary.withValues(alpha: 0.32),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ]
+                  : const [], // Shadow collapses on press for a "pushed in" depth
+            ),
+            child: Center(
+              child: widget.isLoading
+                  ? SizedBox(
+                      width: 22,
+                      height: 22,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2.4,
+                        valueColor: AlwaysStoppedAnimation<Color>(effectiveFg),
+                      ),
+                    )
+                  : Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (widget.icon != null) ...[
+                          Icon(widget.icon, color: effectiveFg, size: 20),
+                          const SizedBox(width: 8),
+                        ],
+                        Flexible(
+                          child: Text(
+                            widget.text,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              color: effectiveFg,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 0.3,
+                            ),
+                          ),
+                        ),
+                        if (widget.trailing != null) ...[
+                          const SizedBox(width: 8),
+                          widget.trailing!,
+                        ],
+                      ],
+                    ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
 }
 
 enum TripActionKind { start, resume, stop }
@@ -150,82 +325,87 @@ class TripActionButton extends StatelessWidget {
 
     final depth = Color.lerp(accent, Colors.black, 0.22)!;
 
-    return Pressable(
-      onPressed: onPressed,
-      semanticLabel: '$title. $subtitle',
-      haptic: haptic,
-      pressedScale: 0.98,
-      borderRadius: BorderRadius.circular(20),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 280),
-        curve: Curves.easeOutCubic,
-        height: compact ? 58 : 64,
-        padding: const EdgeInsets.symmetric(horizontal: 18),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [accent, depth],
-          ),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 520),
+        child: Pressable(
+          onPressed: onPressed,
+          semanticLabel: '$title. $subtitle',
+          haptic: haptic,
+          pressedScale: 0.97,
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: Colors.white.withValues(alpha: 0.18),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: accent.withValues(alpha: 0.28),
-              blurRadius: 14,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: compact ? 36 : 40,
-              height: compact ? 36 : 40,
-              decoration: BoxDecoration(
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 280),
+            curve: Curves.easeOutCubic,
+            height: compact ? 58 : 64,
+            padding: const EdgeInsets.symmetric(horizontal: 18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [accent, depth],
+              ),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
                 color: Colors.white.withValues(alpha: 0.18),
-                borderRadius: BorderRadius.circular(14),
               ),
-              child: Icon(icon, color: Colors.white, size: compact ? 22 : 24),
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.28),
+                  blurRadius: 14,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: -0.2,
-                      height: 1.1,
-                    ),
+            child: Row(
+              children: [
+                Container(
+                  width: compact ? 36 : 40,
+                  height: compact ? 36 : 40,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(14),
                   ),
-                  if (!compact) ...[
-                    const SizedBox(height: 2),
-                    Text(
-                      subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: Colors.white.withValues(alpha: 0.82),
-                        fontWeight: FontWeight.w500,
+                  child: Icon(icon, color: Colors.white, size: compact ? 22 : 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                          height: 1.1,
+                        ),
                       ),
-                    ),
-                  ],
-                ],
-              ),
+                      if (!compact) ...[
+                        const SizedBox(height: 2),
+                        Text(
+                          subtitle,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: Colors.white.withValues(alpha: 0.82),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right_rounded,
+                  color: Colors.white.withValues(alpha: 0.85),
+                  size: 22,
+                ),
+              ],
             ),
-            Icon(
-              Icons.chevron_right_rounded,
-              color: Colors.white.withValues(alpha: 0.85),
-              size: 22,
-            ),
-          ],
+          ),
         ),
       ),
     );
