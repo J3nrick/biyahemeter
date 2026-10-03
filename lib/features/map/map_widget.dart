@@ -8,6 +8,7 @@ import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/core/theme/theme_provider.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/meter/widgets/premium_buttons.dart';
+import 'package:biyahe_meter/services/map_cache_service.dart';
 
 class MapWidget extends StatefulWidget {
   const MapWidget({super.key});
@@ -158,6 +159,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final meter = context.watch<MeterProvider>();
     final isDarkMode = context.watch<ThemeProvider>().isDarkMode;
+    final mapCache = context.watch<MapCacheService>();
     final markerPosition = meter.currentPosition ?? _initialPosition;
     final initialCenter =
         _initialPosition ?? meter.currentPosition ?? _defaultCenter;
@@ -166,71 +168,75 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     return Stack(
       fit: StackFit.expand,
       children: [
-        FlutterMap(
-          mapController: _mapController,
-          options: MapOptions(
-            initialCenter: initialCenter,
-            initialZoom: 15.0,
-            minZoom: 3.0,
-            maxZoom: 19.0,
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+        RepaintBoundary(
+          child: FlutterMap(
+            mapController: _mapController,
+            options: MapOptions(
+              initialCenter: initialCenter,
+              initialZoom: 15.0,
+              minZoom: 3.0,
+              maxZoom: 19.0,
+              interactionOptions: const InteractionOptions(
+                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+              ),
+              onPositionChanged: (camera, hasGesture) {
+                if (hasGesture && _isFollowing) {
+                  setState(() => _isFollowing = false);
+                }
+              },
             ),
-            onPositionChanged: (camera, hasGesture) {
-              if (hasGesture && _isFollowing) {
-                setState(() => _isFollowing = false);
-              }
-            },
-          ),
-          children: [
-            // ESRI Dark Gray Base for dark mode; OpenStreetMap for light mode (no API key required)
-            TileLayer(
-              urlTemplate: isDarkMode
-                  ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
-                  : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'com.biyahemeter.app',
-              maxZoom: 19,
-              tileProvider: NetworkTileProvider(),
-            ),
+            children: [
+              // ESRI Dark Gray Base for dark mode; OpenStreetMap for light mode (no API key required)
+              TileLayer(
+                urlTemplate: isDarkMode
+                    ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+                    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                userAgentPackageName: 'com.biyahemeter.app',
+                maxZoom: 19,
+                panBuffer: 1,
+                keepBuffer: 3,
+                tileProvider: mapCache.createTileProvider(),
+              ),
 
-            // OpenStreetMap Attribution
-            RichAttributionWidget(
-              showFlutterMapAttribution: false,
-              attributions: [
-                TextSourceAttribution(
-                  '© OpenStreetMap, © CARTO',
-                  onTap: null,
+              // OpenStreetMap Attribution
+              RichAttributionWidget(
+                showFlutterMapAttribution: false,
+                attributions: [
+                  TextSourceAttribution(
+                    '© OpenStreetMap, © CARTO',
+                    onTap: null,
+                  ),
+                ],
+              ),
+
+              // Tracked route polyline
+              if (meter.routePoints.length >= 2)
+                PolylineLayer(
+                  polylines: [
+                    Polyline(
+                      points: meter.routePoints,
+                      strokeWidth: 5.0,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ],
                 ),
-              ],
-            ),
 
-            // Tracked route polyline
-            if (meter.routePoints.length >= 2)
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: meter.routePoints,
-                    strokeWidth: 5.0,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ],
-              ),
-
-            // Live GPS marker puck
-            if (markerPosition != null)
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: markerPosition,
-                    width: 36,
-                    height: 36,
-                    alignment: Alignment.center,
-                    child: _GpsPuck(isFollowing: _isFollowing),
-                  ),
-                ],
-              ),
-          ],
+              // Live GPS marker puck
+              if (markerPosition != null)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: markerPosition,
+                      width: 36,
+                      height: 36,
+                      alignment: Alignment.center,
+                      child: _GpsPuck(isFollowing: _isFollowing),
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ),
 
         // ── Right-side map controls: zoom + re-center ──
@@ -440,54 +446,56 @@ class _GpsPuckState extends State<_GpsPuck>
   Widget build(BuildContext context) {
     final primaryColor = Theme.of(context).colorScheme.primary;
 
-    return AnimatedBuilder(
-      animation: _pulseController,
-      builder: (context, child) {
-        final progress = _pulseController.value;
-        final waveRadius = 14.0 + (progress * 16.0);
-        final waveOpacity = (1.0 - progress).clamp(0.0, 1.0) * 0.45;
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _pulseController,
+        builder: (context, child) {
+          final progress = _pulseController.value;
+          final waveRadius = 14.0 + (progress * 16.0);
+          final waveOpacity = (1.0 - progress).clamp(0.0, 1.0) * 0.45;
 
-        return Center(
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Outer pulsing radar wave (when following)
-              if (widget.isFollowing)
+          return Center(
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // Outer pulsing radar wave (when following)
+                if (widget.isFollowing)
+                  Container(
+                    width: waveRadius * 2,
+                    height: waveRadius * 2,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: primaryColor.withValues(alpha: waveOpacity),
+                    ),
+                  ),
+
+                // Crisp high-contrast location dot with white border & glow
                 Container(
-                  width: waveRadius * 2,
-                  height: waveRadius * 2,
+                  width: 22,
+                  height: 22,
                   decoration: BoxDecoration(
+                    color: primaryColor,
                     shape: BoxShape.circle,
-                    color: primaryColor.withValues(alpha: waveOpacity),
+                    border: Border.all(color: Colors.white, width: 3),
+                    boxShadow: [
+                      BoxShadow(
+                        color: primaryColor.withValues(alpha: 0.5),
+                        blurRadius: 10,
+                        spreadRadius: 2,
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.25),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
                   ),
                 ),
-
-              // Crisp high-contrast location dot with white border & glow
-              Container(
-                width: 22,
-                height: 22,
-                decoration: BoxDecoration(
-                  color: primaryColor,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: Colors.white, width: 3),
-                  boxShadow: [
-                    BoxShadow(
-                      color: primaryColor.withValues(alpha: 0.5),
-                      blurRadius: 10,
-                      spreadRadius: 2,
-                    ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.25),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }

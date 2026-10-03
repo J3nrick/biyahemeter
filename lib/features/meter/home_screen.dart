@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -46,7 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
   static const double _snapMid = 0.60;
   static const double _snapMax = 0.90;
 
-  double _sheetExtent = _snapPeek;
+  bool _isCompactSheet = true;
 
   @override
   void initState() {
@@ -218,7 +217,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final mq = MediaQuery.of(context);
     final isNarrow = mq.size.width <= 393;
     final isWide = mq.size.width >= 700;
-    final isCompactSheet = _sheetExtent < 0.42;
     final textScaler = mq.textScaler.clamp(
       minScaleFactor: 0.85,
       maxScaleFactor: 1.25,
@@ -236,9 +234,9 @@ class _HomeScreenState extends State<HomeScreen> {
             _TopStatusBar(meter: meter),
             NotificationListener<DraggableScrollableNotification>(
               onNotification: (notification) {
-                final next = notification.extent;
-                if ((next - _sheetExtent).abs() > 0.01) {
-                  setState(() => _sheetExtent = next);
+                final isCompact = notification.extent < 0.42;
+                if (isCompact != _isCompactSheet) {
+                  setState(() => _isCompactSheet = isCompact);
                 }
                 return false;
               },
@@ -257,7 +255,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     themeProvider: themeProvider,
                     isNarrow: isNarrow,
                     isWide: isWide,
-                    isCompact: isCompactSheet,
+                    isCompact: _isCompactSheet,
                     onExpand: _expandSheet,
                     onOpenSettings: () => _openSettingsSheet(meter),
                     onPrimaryAction: () => _onPrimaryAction(meter),
@@ -310,52 +308,55 @@ class _TopStatusBar extends StatelessWidget {
       top: top + 8,
       left: 12,
       right: mapControlsReserve,
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(18),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            decoration: BoxDecoration(
-              color: Theme.of(context)
-                  .colorScheme
-                  .surface
-                  .withValues(alpha: 0.78),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: AppTheme.borderOf(context).withValues(alpha: 0.5),
-                width: 0.8,
+      child: RepaintBoundary(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          decoration: BoxDecoration(
+            color: Theme.of(context)
+                .colorScheme
+                .surface
+                .withValues(alpha: 0.88),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: AppTheme.borderOf(context).withValues(alpha: 0.55),
+              width: 0.8,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.12),
+                blurRadius: 10,
+                offset: const Offset(0, 3),
               ),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Expanded(
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    children: [
-                      StatusChip(
-                        icon: CupertinoIcons.circle_fill,
-                        label: tripLabel,
-                        color: tripColor,
-                        active: meter.isRunning,
-                      ),
-                      StatusChip(
-                        icon: CupertinoIcons.location_solid,
-                        label: hasFix
-                            ? (gpsLive ? 'GPS Live' : 'GPS Ready')
-                            : 'No GPS',
-                        color: hasFix ? primary : danger,
-                        active: hasFix,
-                      ),
-                    ],
-                  ),
+            ],
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: [
+                    StatusChip(
+                      icon: CupertinoIcons.circle_fill,
+                      label: tripLabel,
+                      color: tripColor,
+                      active: meter.isRunning,
+                    ),
+                    StatusChip(
+                      icon: CupertinoIcons.location_solid,
+                      label: hasFix
+                          ? (gpsLive ? 'GPS Live' : 'GPS Ready')
+                          : 'No GPS',
+                      color: hasFix ? primary : danger,
+                      active: hasFix,
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 8),
-                const _LiveClock(),
-              ],
-            ),
+              ),
+              const SizedBox(width: 8),
+              const _LiveClock(),
+            ],
           ),
         ),
       ),
@@ -446,28 +447,26 @@ class _DashboardSheet extends StatelessWidget {
     final keyboard = MediaQuery.viewInsetsOf(context).bottom;
 
     return RepaintBoundary(
-      child: ClipRRect(
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: theme.colorScheme.surface
-                  .withValues(alpha: isDark ? 0.88 : 0.94),
-              borderRadius:
-                  const BorderRadius.vertical(top: Radius.circular(28)),
-              border: Border.all(
-                color: AppTheme.borderOf(context).withValues(alpha: 0.75),
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.14),
-                  blurRadius: 24,
-                  offset: const Offset(0, -6),
-                ),
-              ],
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface
+              .withValues(alpha: isDark ? 0.94 : 0.97),
+          borderRadius:
+              const BorderRadius.vertical(top: Radius.circular(28)),
+          border: Border.all(
+            color: AppTheme.borderOf(context).withValues(alpha: 0.75),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: isDark ? 0.45 : 0.14),
+              blurRadius: 24,
+              offset: const Offset(0, -6),
             ),
-            child: ListView(
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+          child: ListView(
               controller: scrollController,
               physics: const BouncingScrollPhysics(
                 parent: AlwaysScrollableScrollPhysics(),
@@ -542,9 +541,8 @@ class _DashboardSheet extends StatelessWidget {
             ),
           ),
         ),
-      ),
-    );
-  }
+      );
+    }
 }
 
 class _HeaderRow extends StatelessWidget {
@@ -1022,19 +1020,15 @@ class _SettingsBottomSheet extends StatelessWidget {
     final isNarrow = MediaQuery.sizeOf(context).width <= 393;
     final themeProvider = context.watch<ThemeProvider>();
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
-        child: Container(
-          constraints: BoxConstraints(
-            maxHeight: MediaQuery.sizeOf(context).height * 0.82,
-          ),
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface.withValues(alpha: 0.96),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            border: Border.all(color: AppTheme.borderOf(context)),
-          ),
+    return Container(
+      constraints: BoxConstraints(
+        maxHeight: MediaQuery.sizeOf(context).height * 0.82,
+      ),
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface.withValues(alpha: 0.96),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        border: Border.all(color: AppTheme.borderOf(context)),
+      ),
           child: SingleChildScrollView(
             padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
             child: Column(
@@ -1344,10 +1338,8 @@ class _SettingsBottomSheet extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
+        );
+      }
 }
 
 class _SettingsGroup extends StatelessWidget {

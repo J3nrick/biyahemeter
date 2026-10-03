@@ -20,7 +20,7 @@ class GlassCard extends StatelessWidget {
     this.padding,
     this.margin,
     this.borderRadius = 20,
-    this.blurSigma = 14,
+    this.blurSigma = 0,
     this.color,
     this.onTap,
   });
@@ -33,20 +33,24 @@ class GlassCard extends StatelessWidget {
         theme.colorScheme.surface.withValues(alpha: isDark ? 0.72 : 0.82);
     final border = AppTheme.borderOf(context).withValues(alpha: isDark ? 0.55 : 0.9);
 
+    final surface = Container(
+      padding: padding ?? const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: fill,
+        borderRadius: BorderRadius.circular(borderRadius),
+        border: Border.all(color: border, width: 0.8),
+      ),
+      child: child,
+    );
+
     final content = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
-        child: Container(
-          padding: padding ?? const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: fill,
-            borderRadius: BorderRadius.circular(borderRadius),
-            border: Border.all(color: border, width: 0.8),
-          ),
-          child: child,
-        ),
-      ),
+      child: blurSigma > 0
+          ? BackdropFilter(
+              filter: ImageFilter.blur(sigmaX: blurSigma, sigmaY: blurSigma),
+              child: surface,
+            )
+          : surface,
     );
 
     return Container(

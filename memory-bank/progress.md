@@ -16,6 +16,7 @@
 - High-definition favicon and PWA icon suite (`favicon.png`, `Icon-192`, `Icon-512`, `Icon-maskable-*`) designed and generated with Apple-style rounded squircle gradient and subpixel-smoothed HD BiyaheMeter mark.
 - Map renderer restored to high-performance `flutter_map` (7.0.2) + CartoDB dark/light raster tiles + OSM attribution + animated pulsing GPS radar puck + offline caching (`MapCacheService`), resolving black/blank map failure from `maplibre_gl`.
 - Premium interactive button architecture implemented (`PremiumInteractiveButton` and dual-stage `Pressable`) featuring 95% depress micro-animations, physical shadow collapse, dual-stage tactile haptics (`lightImpact` on press, `selectionClick` on release), and responsive `ConstrainedBox` max-width bounds across mobile and tablet/desktop viewports.
+- Comprehensive UI lag elimination across the app: throttled sheet drag rebuilds, isolated pulsing GPS puck and map canvas with `RepaintBoundary`, replaced costly multi-pass GPU `BackdropFilter` shaders with performant translucent system materials, and integrated tile caching.
 
 ## Known Issues / Bugs
 - None logged. All Flutter analysis and build checks passing with 0 errors.
