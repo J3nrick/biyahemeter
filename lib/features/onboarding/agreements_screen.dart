@@ -12,7 +12,7 @@ import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 /// - Clean top header reading "Before You Ride"
 /// - Animated LinearProgressIndicator with "X of 3 acknowledged" indicator
 /// - 3 mandatory legal/safety items in elevated Cards with rounded corners & subtle shadows
-///   (Checkboxes aligned to the right)
+///   (Checkboxes aligned cleanly to the right, no distracting or broken icon glyphs)
 /// - Subdued "Trip Defaults" configuration tile (visually distinct, not a checkbox)
 /// - Large sticky ElevatedButton at bottom, disabled until all 3 checkboxes are true
 /// - Helper text below: "Acknowledge all 3 items to continue."
@@ -243,7 +243,6 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
                       title: 'Fare Estimates & Terms',
                       description:
                           'Fare calculations follow standard rates based on distance and waiting time. Actual traffic conditions may vary.',
-                      icon: Icons.receipt_long_rounded,
                       value: _fareEstimatesAccepted,
                       cardBg: cardBg,
                       cardBorder: cardBorder,
@@ -261,7 +260,6 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
                       title: 'Route & Data Privacy',
                       description:
                           'GPS location is accessed exclusively in real-time to compute accurate transit distance. No personal tracking data is stored.',
-                      icon: Icons.location_on_outlined,
                       value: _routePrivacyAccepted,
                       cardBg: cardBg,
                       cardBorder: cardBorder,
@@ -279,7 +277,6 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
                       title: 'Responsible Rate Use',
                       description:
                           'Calculations serve as transparent fare estimates. Ensure adherence to official transport regulations during your ride.',
-                      icon: Icons.verified_user_outlined,
                       value: _responsibleRateAccepted,
                       cardBg: cardBg,
                       cardBorder: cardBorder,
@@ -334,49 +331,24 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Container(
-                                    width: 36,
-                                    height: 36,
-                                    decoration: BoxDecoration(
-                                      color: isDark
-                                          ? const Color(0xFF1E293B)
-                                          : const Color(0xFFE2E8F0),
-                                      borderRadius: BorderRadius.circular(10),
-                                    ),
-                                    child: Icon(
-                                      Icons.tune_rounded,
-                                      size: 18,
-                                      color: isDark
-                                          ? const Color(0xFF94A3B8)
-                                          : const Color(0xFF475569),
+                                  const Text(
+                                    'Trip Configuration',
+                                    style: TextStyle(
+                                      fontSize: 15,
+                                      fontWeight: FontWeight.w600,
                                     ),
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        const Text(
-                                          'Trip Configuration',
-                                          style: TextStyle(
-                                            fontSize: 15,
-                                            fontWeight: FontWeight.w600,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 2),
-                                        Text(
-                                          'Default vehicle & fuel calculation metrics',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: isDark
-                                                ? const Color(0xFF94A3B8)
-                                                : const Color(0xFF64748B),
-                                          ),
-                                        ),
-                                      ],
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    'Default vehicle & fuel calculation metrics',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: isDark
+                                          ? const Color(0xFF94A3B8)
+                                          : const Color(0xFF64748B),
                                     ),
                                   ),
                                 ],
@@ -459,23 +431,14 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
                           borderRadius: BorderRadius.circular(16),
                         ),
                       ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Text(
-                            _allAccepted
-                                ? 'Continue to Meter'
-                                : 'Accept All to Continue',
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                          if (_allAccepted) ...[
-                            const SizedBox(width: 8),
-                            const Icon(Icons.arrow_forward_rounded, size: 20),
-                          ],
-                        ],
+                      child: Text(
+                        _allAccepted
+                            ? 'Continue to Meter'
+                            : 'Accept All to Continue',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
@@ -509,7 +472,6 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
 class _AgreementCard extends StatelessWidget {
   final String title;
   final String description;
-  final IconData icon;
   final bool value;
   final Color cardBg;
   final Color cardBorder;
@@ -519,7 +481,6 @@ class _AgreementCard extends StatelessWidget {
   const _AgreementCard({
     required this.title,
     required this.description,
-    required this.icon,
     required this.value,
     required this.cardBg,
     required this.cardBorder,
@@ -529,9 +490,6 @@ class _AgreementCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final isDark = theme.brightness == Brightness.dark;
-
     return Card(
       elevation: value ? 2.5 : 1.0,
       margin: EdgeInsets.zero,
@@ -553,35 +511,10 @@ class _AgreementCard extends StatelessWidget {
         },
         borderRadius: BorderRadius.circular(16),
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
           child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // Icon with soft rounded background
-              Container(
-                width: 40,
-                height: 40,
-                margin: const EdgeInsets.only(top: 2),
-                decoration: BoxDecoration(
-                  color: value
-                      ? transitBlue.withValues(alpha: 0.12)
-                      : (isDark
-                          ? const Color(0xFF1E293B)
-                          : const Color(0xFFF1F5F9)),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  icon,
-                  size: 20,
-                  color: value
-                      ? transitBlue
-                      : (isDark
-                          ? const Color(0xFF94A3B8)
-                          : const Color(0xFF64748B)),
-                ),
-              ),
-              const SizedBox(width: 14),
-
               // Title and Description
               Expanded(
                 child: Column(
@@ -600,7 +533,7 @@ class _AgreementCard extends StatelessWidget {
                       description,
                       style: TextStyle(
                         fontSize: 12.5,
-                        color: isDark
+                        color: Theme.of(context).brightness == Brightness.dark
                             ? const Color(0xFF94A3B8)
                             : const Color(0xFF64748B),
                         height: 1.35,
@@ -610,11 +543,11 @@ class _AgreementCard extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(width: 8),
+              const SizedBox(width: 14),
 
               // Checkbox aligned to the right
               Transform.scale(
-                scale: 1.1,
+                scale: 1.15,
                 child: Checkbox(
                   value: value,
                   activeColor: transitBlue,
