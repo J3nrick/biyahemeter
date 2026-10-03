@@ -7,7 +7,6 @@ import 'package:provider/provider.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/core/theme/theme_provider.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
-import 'package:biyahe_meter/services/map_cache_service.dart';
 import 'package:biyahe_meter/features/meter/widgets/premium_buttons.dart';
 
 class MapWidget extends StatefulWidget {
@@ -159,7 +158,6 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     final meter = context.watch<MeterProvider>();
     final isDarkMode = context.watch<ThemeProvider>().isDarkMode;
-    final mapCache = context.watch<MapCacheService>();
     final markerPosition = meter.currentPosition ?? _initialPosition;
     final initialCenter =
         _initialPosition ?? meter.currentPosition ?? _defaultCenter;
@@ -185,15 +183,15 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
             },
           ),
           children: [
-            // CartoDB tiles: dark-matter for dark mode, positron for light mode
+            // ESRI Dark Gray Base for dark mode; OpenStreetMap for light mode (no API key required)
             TileLayer(
               urlTemplate: isDarkMode
-                  ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-                  : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png',
-              subdomains: const ['a', 'b', 'c', 'd'],
+                  ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
+                  : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+              fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
               userAgentPackageName: 'com.biyahemeter.app',
               maxZoom: 19,
-              tileProvider: mapCache.createTileProvider(),
+              tileProvider: NetworkTileProvider(),
             ),
 
             // OpenStreetMap Attribution
