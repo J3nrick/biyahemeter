@@ -4,11 +4,11 @@
 Vercel deployment verification and live mobile testing.
 
 ## Recent Changes
-- Implemented Full HD logo-only Splash and Loading Screen with custom BiyaheMeter animation:
-  - `SplashScreen`: Features the pure Full HD BiyaheMeter logo (1292x436) centered on a deep transit midnight blue gradient (`#071126` -> `#0A1838` -> `#060D1F`), with all extra text removed.
-  - Custom BiyaheMeter Animation: Apple-style critically damped spring reveal (`0.86` -> `1.02` -> `1.0`), ambient luminous meter glow, dynamic meter sweep shimmer running across the speedometer track, and a smooth forward departure launch into the Agreements screen at 3.0s.
-  - `web/index.html`: Fully synchronized web loading screen displaying the Full HD logo asset with matching ambient pulse and zero text.
-  - Recompiled and bundled web release to `build/web/` for Vercel deployment. Zero analyzer issues.
+- Elevated Splash & Loading Screens with luxury elegance and finesse:
+  - Re-rendered logo with Gaussian-weighted subpixel edge reconstruction (1308x452) for silk-smooth contours and zero staircasing.
+  - Replaced linear bands with deep atmospheric obsidian-sapphire radial vignette (`#0A142D` -> `#060B1A` -> `#03050B`) and breathing ambient aura.
+  - Re-choreographed motion with poised `Curves.easeOutCubic` emergence (`0.94` -> `1.0`), diagonal specular icy-azure glass sheen pass across contours, and 450ms fluid cross-dissolve transition into Agreements.
+  - Recompiled web release to `build/web/` for Vercel deployment. 0 analyzer issues.
 
 ## Immediate Next Steps
 - Verify Vercel deployment URL updates to display the new splash and agreements experience.
