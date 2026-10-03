@@ -13,6 +13,7 @@
 - Driver Insights (`analytics_screen.dart`): refactored metric cards and trip list items to grouped translucent materials.
 - Live mobile application execution and hot reload confirmed running on `iPhone_17_Pro` virtual device (1206x2622 px @ 460 ppi, 19.5:9 display ratio, hole cutout).
 - Web release output compiled via `flutter build web --release` and pushed to `origin/main` for Vercel static serving.
+- High-definition favicon and PWA icon suite (`favicon.png`, `Icon-192`, `Icon-512`, `Icon-maskable-*`) designed and generated with Apple-style rounded squircle gradient and subpixel-smoothed HD BiyaheMeter mark.
 
 ## Known Issues / Bugs
 - None logged. All Flutter analysis and build checks passing with 0 errors.
