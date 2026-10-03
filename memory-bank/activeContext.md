@@ -4,11 +4,11 @@
 Vercel deployment verification and live mobile testing.
 
 ## Recent Changes
-- Built synchronized SplashScreen and AgreementsScreen per user specifications:
-  - `SplashScreen`: Scaffold with deep transit blue gradient (`#071126` -> `#0A1838`), floating logo mark without container boxes, bold white "BiyaheMeter" wordmark, exact single tagline "Know your fare. Plan your byahe.", minimalist thin white CircularProgressIndicator, and exact 3.0s timer transition.
-  - `web/index.html`: Synchronized HTML pre-hydration loader with the exact same deep blue gradient, floating logo, typography, and spinner for zero visual flicker on web/Vercel.
-  - `AgreementsScreen`: "Before You Ride" header, animated LinearProgressIndicator with "X of 3 acknowledged" indicator, 3 elevated Cards with rounded corners & subtle shadows (Fare Estimates & Terms, Route & Data Privacy, Responsible Rate Use) with checkboxes on the right, subdued Trip Defaults configuration tile (12.0 km/L), and large sticky ElevatedButton disabled until all 3 are checked.
-  - Recompiled web release via `flutter build web --release` into `build/web/`. All checks passed with 0 analyzer issues.
+- Implemented Full HD logo-only Splash and Loading Screen with custom BiyaheMeter animation:
+  - `SplashScreen`: Features the pure Full HD BiyaheMeter logo (1292x436) centered on a deep transit midnight blue gradient (`#071126` -> `#0A1838` -> `#060D1F`), with all extra text removed.
+  - Custom BiyaheMeter Animation: Apple-style critically damped spring reveal (`0.86` -> `1.02` -> `1.0`), ambient luminous meter glow, dynamic meter sweep shimmer running across the speedometer track, and a smooth forward departure launch into the Agreements screen at 3.0s.
+  - `web/index.html`: Fully synchronized web loading screen displaying the Full HD logo asset with matching ambient pulse and zero text.
+  - Recompiled and bundled web release to `build/web/` for Vercel deployment. Zero analyzer issues.
 
 ## Immediate Next Steps
 - Verify Vercel deployment URL updates to display the new splash and agreements experience.
