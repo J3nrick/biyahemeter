@@ -109,8 +109,6 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
     final cardBorder = isDark
         ? Colors.white.withValues(alpha: 0.08)
         : const Color(0xFFE2E8F0);
-    final progressBg =
-        isDark ? const Color(0xFF1E293B) : const Color(0xFFE2E8F0);
     final subduedBg =
         isDark ? const Color(0xFF0F172A) : const Color(0xFFF1F5F9);
 
@@ -119,124 +117,89 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Scrollable Content
+            // Scrollable Content with hidden scrollbars
             Expanded(
-              child: SingleChildScrollView(
-                physics: const BouncingScrollPhysics(),
-                padding: EdgeInsets.fromLTRB(
-                  horizontalPadding,
-                  24,
-                  horizontalPadding,
-                  24,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    // ── Header & Progress ──
-                    const Text(
-                      'Before You Ride',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        letterSpacing: -0.6,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Text(
-                      'Review and acknowledge key safety and fare policies before starting your trip.',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: isDark
-                            ? const Color(0xFF94A3B8)
-                            : const Color(0xFF64748B),
-                        height: 1.35,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-
-                    // Progress Section
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          '$_acknowledgedCount of 3 acknowledged',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: _allAccepted
-                                ? transitBlue
-                                : (isDark
-                                    ? const Color(0xFF94A3B8)
-                                    : const Color(0xFF475569)),
-                          ),
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+                child: SingleChildScrollView(
+                  physics: const BouncingScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(
+                    horizontalPadding,
+                    24,
+                    horizontalPadding,
+                    24,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: [
+                      // ── Header ──
+                      const Text(
+                        'Before You Ride',
+                        style: TextStyle(
+                          fontSize: 28,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.6,
                         ),
-                        if (!_allAccepted)
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                _fareEstimatesAccepted = true;
-                                _routePrivacyAccepted = true;
-                                _responsibleRateAccepted = true;
-                              });
-                              _syncToProvider();
-                              try {
-                                HapticFeedback.selectionClick();
-                              } catch (_) {}
-                            },
-                            child: const Text(
-                              'Acknowledge All',
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Review and acknowledge key safety and fare policies before starting your trip.',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: isDark
+                              ? const Color(0xFF94A3B8)
+                              : const Color(0xFF64748B),
+                          height: 1.35,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+
+                      // ── Mandatory Items (Cards) ──
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        crossAxisAlignment: CrossAxisAlignment.end,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(left: 2, bottom: 10),
+                            child: Text(
+                              'MANDATORY POLICIES',
                               style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: transitBlue,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                letterSpacing: 1.2,
+                                color: isDark
+                                    ? const Color(0xFF64748B)
+                                    : const Color(0xFF94A3B8),
                               ),
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // Animated LinearProgressIndicator
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: SizedBox(
-                        height: 6,
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween<double>(
-                            begin: 0.0,
-                            end: _acknowledgedCount / 3.0,
-                          ),
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOutCubic,
-                          builder: (context, value, _) {
-                            return LinearProgressIndicator(
-                              value: value,
-                              backgroundColor: progressBg,
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                  transitBlue),
-                            );
-                          },
-                        ),
+                          if (!_allAccepted)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 2, bottom: 8),
+                              child: GestureDetector(
+                                onTap: () {
+                                  setState(() {
+                                    _fareEstimatesAccepted = true;
+                                    _routePrivacyAccepted = true;
+                                    _responsibleRateAccepted = true;
+                                  });
+                                  _syncToProvider();
+                                  try {
+                                    HapticFeedback.selectionClick();
+                                  } catch (_) {}
+                                },
+                                child: const Text(
+                                  'Acknowledge All',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: transitBlue,
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
                       ),
-                    ),
-
-                    const SizedBox(height: 28),
-
-                    // ── Mandatory Items (Cards) ──
-                    Padding(
-                      padding: const EdgeInsets.only(left: 2, bottom: 10),
-                      child: Text(
-                        'MANDATORY POLICIES',
-                        style: TextStyle(
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.2,
-                          color: isDark
-                              ? const Color(0xFF64748B)
-                              : const Color(0xFF94A3B8),
-                        ),
-                      ),
-                    ),
 
                     // Card 1: Fare Estimates & Terms
                     _AgreementCard(
@@ -389,6 +352,7 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
                 ),
               ),
             ),
+          ),
 
             // ── Sticky Call to Action at Bottom ──
             Container(

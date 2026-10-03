@@ -118,6 +118,7 @@ class BiyaheMeterApp extends StatelessWidget {
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
               themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              scrollBehavior: const MaterialScrollBehavior().copyWith(scrollbars: false),
               home: const _SplashGate(),
             ),
           );
