@@ -17,9 +17,11 @@ Implemented the user-selected **Neon Transit Beam Reveal & Hyperspace Zoom** spl
    - Radial velocity light streaks ignite.
    - The logo accelerates directly towards the camera (1.0x -> 3.4x) with an ease-in exponential curve and soft luminous aperture flash, dissolving seamlessly into the Agreements Screen at exactly 3.0s.
 
-## Verification:
-- `dart analyze`: 0 warnings, 0 errors.
-- `flutter build web --release`: Compiled successfully in 24.6s.
+## Deployment & Git Status:
+- Branch: `main`
+- Commit: `305e18e` (Pushed to `origin/main`)
+- Deployed to Vercel production.
+
 
 
 
