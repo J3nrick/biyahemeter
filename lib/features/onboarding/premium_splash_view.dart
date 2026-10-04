@@ -53,6 +53,7 @@ class _SplashScreenState extends State<SplashScreen>
   ImageInfo? _logoInfo;
   bool _resolved = false;
   bool _started = false;
+  bool _warming = false;
 
   Timer? _startFallback;
   Timer? _safetyTimer;
@@ -72,8 +73,8 @@ class _SplashScreenState extends State<SplashScreen>
       }
     });
 
-    // If the logo somehow can't be decoded quickly, never block the app.
-    _startFallback = Timer(const Duration(milliseconds: 1500), _begin);
+    // Never block the app: covers slow decode + the (capped) shader warm-up.
+    _startFallback = Timer(const Duration(milliseconds: 2200), _begin);
   }
 
   @override
@@ -92,11 +93,60 @@ class _SplashScreenState extends State<SplashScreen>
         _logoInfo?.dispose();
         _logoInfo = info.clone();
         if (!synchronousCall && mounted) setState(() {});
-        WidgetsBinding.instance.addPostFrameCallback((_) => _begin());
+        _warmUpThenBegin();
       },
       onError: (_, _) => _begin(),
     );
     stream.addListener(_listener!);
+  }
+
+  /// The logo has an aspect ratio of approx 2.9 : 1 (1308 x 452).
+  static (double, double) _logoDims(Size size) {
+    final isTablet = size.width >= 600;
+    final w = (size.width * (isTablet ? 0.45 : 0.76)).clamp(270.0, 420.0);
+    return (w, w / 2.894);
+  }
+
+  /// Render a handful of frames offscreen (tiny, 1/4 scale) BEFORE the clock
+  /// starts. This makes the GPU compile every gradient / clip / image pipeline
+  /// the animation uses, so the first real appearance of each effect is not a
+  /// frame-time spike. Capped so it can never delay the splash noticeably.
+  Future<void> _warmUpThenBegin() async {
+    if (_started || _warming) return;
+    _warming = true;
+    try {
+      await _warmUp().timeout(const Duration(milliseconds: 700));
+    } catch (_) {}
+    if (!mounted) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) => _begin());
+  }
+
+  Future<void> _warmUp() async {
+    final img = _logoInfo?.image;
+    if (img == null) return;
+    final size = MediaQuery.sizeOf(context);
+    final (lw, lh) = _logoDims(size);
+    const scale = 0.25;
+    final w = math.max(1, (size.width * scale).ceil());
+    final h = math.max(1, (size.height * scale).ceil());
+
+    // One time-point inside each effect: beam, reveal+wavefront, meter flash,
+    // glint, hyperspace rays/zoom, departure flash.
+    for (final t in const [0.10, 0.28, 0.50, 0.62, 0.74, 0.88, 0.96]) {
+      final recorder = ui.PictureRecorder();
+      final canvas = Canvas(recorder);
+      canvas.scale(scale);
+      _SplashPainter(
+        anim: AlwaysStoppedAnimation<double>(t),
+        image: img,
+        logoWidth: lw,
+        logoHeight: lh,
+      ).paint(canvas, size);
+      final picture = recorder.endRecording();
+      final out = await picture.toImage(w, h);
+      out.dispose();
+      picture.dispose();
+    }
   }
 
   void _begin() {
@@ -175,11 +225,7 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
-    final isTablet = size.width >= 600;
-    // The logo has an aspect ratio of approx 2.9 : 1 (1308 x 452)
-    final logoWidth =
-        (size.width * (isTablet ? 0.45 : 0.76)).clamp(270.0, 420.0);
-    final logoHeight = logoWidth / 2.894;
+    final (logoWidth, logoHeight) = _logoDims(size);
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -239,6 +285,10 @@ class _SplashScreenState extends State<SplashScreen>
 double _seg(double t, double a, double b, [Curve curve = Curves.linear]) {
   return curve.transform(((t - a) / (b - a)).clamp(0.0, 1.0));
 }
+
+/// Gentle start, long soft landing: used for the upward reveal so it flows out
+/// of the laser instead of snapping on.
+const Curve _softOut = Cubic(0.30, 0.0, 0.15, 1.0);
 
 /// Up-then-down pulse across [a]..[b], peaking at [peak] (0..1 of the window).
 double _pulse(
@@ -304,23 +354,42 @@ class _SplashPainter extends CustomPainter {
     stops: const [0.0, 0.25, 0.50, 0.75, 1.0],
   ).createShader(Rect.fromLTWH(0, 0, logoWidth, 1));
 
+  late final ui.Shader _waveGlowShader = LinearGradient(
+    colors: [
+      Colors.transparent,
+      _cyan.withValues(alpha: 0.16),
+      _cyan.withValues(alpha: 0.28),
+      _cyan.withValues(alpha: 0.16),
+      Colors.transparent,
+    ],
+    stops: const [0.0, 0.25, 0.50, 0.75, 1.0],
+  ).createShader(Rect.fromLTWH(0, 0, logoWidth, 1));
+
   @override
   void paint(Canvas canvas, Size size) {
     final t = anim.value;
 
-    final exit = 1.0 - _seg(t, 0.93, 1.0, Curves.easeIn);
-    final beam = -0.15 + 1.30 * _seg(t, 0.02, 0.24, Curves.easeInOutCubic);
-    final reveal = _seg(t, 0.20, 0.50, Curves.easeOutCubic);
-    final meterFlash = _pulse(t, 0.44, 0.56, peak: 0.35);
-    final specular = -1.2 + 3.4 * _seg(t, 0.50, 0.78, Curves.easeInOutCubic);
+    // Phases deliberately OVERLAP and every curve is soft at both ends, so the
+    // motion never stops-and-restarts between phases.
+    final exit = 1.0 - _seg(t, 0.89, 1.0, Curves.easeInOutSine);
+    final beam = -0.15 + 1.30 * _seg(t, 0.0, 0.27, Curves.easeInOutSine);
+    final reveal = _seg(t, 0.13, 0.52, _softOut);
+    final meterFlash = _pulse(t, 0.42, 0.58,
+        peak: 0.4, up: Curves.easeInOutSine, down: Curves.easeInOutSine);
+    final specular = -1.2 + 3.4 * _seg(t, 0.46, 0.80, Curves.easeInOutSine);
     final breathe = _breathe(t);
-    final zoom = 1.0 + 2.4 * _seg(t, 0.80, 1.0, Curves.easeInCubic);
-    final rays = _pulse(t, 0.78, 1.0,
-        peak: 0.6, up: Curves.easeOutCubic, down: Curves.easeIn);
+    // The logo never sits still: it settles in with a slow continuous push-in
+    // (easeOutSine keeps a gentle velocity), then the hyperspace pull ramps up
+    // smoothly from that same drift.
+    final drift = 0.94 + 0.11 * _seg(t, 0.0, 1.0, Curves.easeOutSine);
+    final zoom = drift * (1.0 + 2.3 * _seg(t, 0.76, 1.0, Curves.easeInCubic));
+    final rays = _pulse(t, 0.76, 0.98,
+        peak: 0.55, up: Curves.easeOutSine, down: Curves.easeInSine);
+    final rayTravel = _seg(t, 0.74, 1.0, Curves.easeInCubic);
 
     final center = Offset(size.width / 2, size.height / 2);
 
-    if (rays > 0.01) _paintRays(canvas, size, center, rays);
+    if (rays > 0.01) _paintRays(canvas, size, center, rays, rayTravel);
 
     _paintBloom(canvas, center, reveal * 0.42 * breathe * exit, zoom);
 
@@ -332,15 +401,15 @@ class _SplashPainter extends CustomPainter {
 
     _paintLogo(canvas, reveal, exit);
     if (specular > -0.25 && specular < 1.25) _paintGlint(canvas, specular);
-    _paintRoadBeam(canvas, beam, reveal);
+    _paintRoadBeam(canvas, beam, reveal, exit);
     if (reveal > 0.02 && reveal < 0.98) _paintWavefront(canvas, reveal);
     if (meterFlash > 0.01) _paintMeterFlash(canvas, meterFlash);
 
     canvas.restore();
 
     // ---- Optical flash bloom at the moment of departure.
-    if (t >= 0.88) {
-      final flash = (math.sin((t - 0.88) / 0.12 * math.pi) * 0.45).clamp(0.0, 1.0);
+    if (t >= 0.86) {
+      final flash = (math.sin((t - 0.86) / 0.14 * math.pi) * 0.40).clamp(0.0, 1.0);
       if (flash > 0.005) {
         _fill
           ..shader = null
@@ -350,18 +419,15 @@ class _SplashPainter extends CustomPainter {
     }
   }
 
+  /// One continuous swell (no kinks): rises with the reveal, falls into the zoom.
   double _breathe(double t) {
-    if (t <= 0.45) return 0.75;
-    if (t >= 0.82) return 0.85;
-    final u = (t - 0.45) / (0.82 - 0.45);
-    if (u < 0.5) {
-      return 0.75 + 0.25 * Curves.easeInOut.transform(u / 0.5);
-    }
-    return 1.0 - 0.15 * Curves.easeInOut.transform((u - 0.5) / 0.5);
+    final u = _seg(t, 0.30, 0.92);
+    return 0.76 + 0.24 * math.sin(u * math.pi);
   }
 
-  // ----- Hyperspace rays: 4 batched draw calls, no shaders ------------------
-  void _paintRays(Canvas canvas, Size size, Offset c, double intensity) {
+  // ----- Hyperspace rays: streaks that TRAVEL outward (head leads, tail follows)
+  // 4 batched draw calls, no shaders.
+  void _paintRays(Canvas canvas, Size size, Offset c, double intensity, double travel) {
     final maxRadius = math.sqrt(size.width * size.width + size.height * size.height) / 2;
 
     const rayCount = 24;
@@ -373,14 +439,22 @@ class _SplashPainter extends CustomPainter {
     for (int i = 0; i < rayCount; i++) {
       final angle = (i / rayCount) * (2 * math.pi) + (i * 0.15);
       final innerDist = 60.0 + (i % 3 * 25.0);
-      final outerDist = innerDist + ((maxRadius - innerDist) * intensity);
-      final midDist = innerDist + (outerDist - innerDist) * 0.55;
+      final span = maxRadius - innerDist;
+
+      // Each ray moves at its own pace so the burst feels organic, not uniform.
+      final pace = 0.78 + 0.22 * (((i * 7) % 10) / 9.0);
+      final headP = (travel * pace * 1.15).clamp(0.0, 1.0);
+      final tailP = ((travel * pace * 1.15 - 0.38) / 0.62).clamp(0.0, 1.0);
+
+      final headDist = innerDist + span * headP;
+      final tailDist = innerDist + span * tailP * tailP;
+      final midDist = tailDist + (headDist - tailDist) * 0.6;
 
       final cosA = math.cos(angle);
       final sinA = math.sin(angle);
-      final p1 = Offset(c.dx + innerDist * cosA, c.dy + innerDist * sinA);
+      final p1 = Offset(c.dx + tailDist * cosA, c.dy + tailDist * sinA);
       final pm = Offset(c.dx + midDist * cosA, c.dy + midDist * sinA);
-      final p2 = Offset(c.dx + outerDist * cosA, c.dy + outerDist * sinA);
+      final p2 = Offset(c.dx + headDist * cosA, c.dy + headDist * sinA);
 
       final thick = i % 4 == 0;
       (thick ? thickTail : thinTail).addAll([p1, p2]);
@@ -408,7 +482,8 @@ class _SplashPainter extends CustomPainter {
     final a = opacity.clamp(0.0, 1.0);
     if (a <= 0.005) return;
 
-    final s = zoom > 1.2 ? zoom * 0.7 : 1.0;
+    // Continuous growth (the old step at zoom 1.2 made the glow visibly pop).
+    final s = 1.0 + (math.max(zoom, 1.0) - 1.0) * 0.55;
     final w1 = logoWidth * 1.6 * s;
     final h1 = logoHeight * 2.8 * s;
     final r = 0.65 * math.min(w1, h1);
@@ -450,20 +525,21 @@ class _SplashPainter extends CustomPainter {
       return;
     }
 
-    const feather = 0.12;
+    const feather = 0.16;
     final yLine = (1.0 + feather) * (1.0 - reveal);
 
     // Fully-revealed body below the wavefront.
     _drawSlice(canvas, img, yLine.clamp(0.0, 1.0), 1.0, exit);
 
-    // Soft feathered leading edge above it.
-    const strips = 8;
+    // Soft feathered leading edge above it (eased so it fades in, not stair-steps).
+    const strips = 16;
     for (int i = 0; i < strips; i++) {
       final s0 = (yLine - feather + feather * i / strips).clamp(0.0, 1.0);
       final s1 = (yLine - feather + feather * (i + 1) / strips).clamp(0.0, 1.0);
       if (s1 <= s0) continue;
       final mid = (s0 + s1) / 2;
-      final a = (1.0 - (yLine - mid) / feather).clamp(0.0, 1.0);
+      final a = Curves.easeInOutSine
+          .transform((1.0 - (yLine - mid) / feather).clamp(0.0, 1.0));
       _drawSlice(canvas, img, s0, s1, a * exit);
     }
   }
@@ -498,11 +574,14 @@ class _SplashPainter extends CustomPainter {
   }
 
   // ----- Neon laser along the road baseline ---------------------------------
-  void _paintRoadBeam(Canvas canvas, double beamPos, double reveal) {
+  void _paintRoadBeam(Canvas canvas, double beamPos, double reveal, double exit) {
     // Road lives in the bottom 18px strip of the logo.
     final y = (logoHeight - 18) + 18 * 0.55;
 
-    if (beamPos > 0.0) {
+    // The laser exits the logo and fades out; it must NOT linger at the edge.
+    final f = 1.0 - _seg(beamPos, 0.92, 1.15, Curves.easeInSine);
+
+    if (beamPos > 0.0 && f > 0.01) {
       final trailEnd = (beamPos * logoWidth).clamp(0.0, logoWidth);
       final trailStart = ((beamPos - 0.45) * logoWidth).clamp(0.0, logoWidth);
 
@@ -512,8 +591,8 @@ class _SplashPainter extends CustomPainter {
         // Neon aura: two stacked translucent bands instead of a blur filter.
         _fill.shader = LinearGradient(colors: [
           Colors.transparent,
-          _blue.withValues(alpha: 0.20),
-          _cyan.withValues(alpha: 0.30),
+          _blue.withValues(alpha: 0.20 * f),
+          _cyan.withValues(alpha: 0.30 * f),
         ]).createShader(rect);
         canvas.drawRRect(
           RRect.fromLTRBR(trailStart, y - 6, trailEnd, y + 6, const Radius.circular(6)),
@@ -527,8 +606,8 @@ class _SplashPainter extends CustomPainter {
         // Sharp laser core.
         _fill.shader = LinearGradient(colors: [
           Colors.transparent,
-          _cyan,
-          Colors.white,
+          _cyan.withValues(alpha: f),
+          Colors.white.withValues(alpha: f),
         ]).createShader(rect);
         canvas.drawRRect(
           RRect.fromLTRBR(trailStart, y - 1.2, trailEnd, y + 1.2, const Radius.circular(1.2)),
@@ -540,14 +619,14 @@ class _SplashPainter extends CustomPainter {
         _fill.shader = RadialGradient(
           radius: 0.5,
           colors: [
-            _cyan.withValues(alpha: 0.95),
+            _cyan.withValues(alpha: 0.95 * f),
             _cyan.withValues(alpha: 0.0),
           ],
         ).createShader(Rect.fromCircle(center: head, radius: 14));
         canvas.drawCircle(head, 14, _fill);
         _fill
           ..shader = null
-          ..color = Colors.white;
+          ..color = Colors.white.withValues(alpha: f);
         canvas.drawCircle(head, 3.2, _fill);
       }
     }
@@ -567,10 +646,12 @@ class _SplashPainter extends CustomPainter {
 
       double alpha = 0.0;
       if (beamPos >= trigger) {
-        final dist = (beamPos - trigger).abs();
-        alpha = dist < 0.12
-            ? 1.0 - dist / 0.12
-            : (0.28 * reveal).clamp(0.0, 0.45);
+        // Bright flash as the laser passes, easing down into a soft settled glow
+        // (max() keeps brightness continuous - no dip-then-jump).
+        final d = ((beamPos - trigger) / 0.16).clamp(0.0, 1.0);
+        final flash = (1.0 - d) * (1.0 - d);
+        final settled = 0.30 * reveal * Curves.easeOutSine.transform(d);
+        alpha = math.max(flash, settled) * exit;
       }
 
       if (alpha > 0.02) {
@@ -582,11 +663,30 @@ class _SplashPainter extends CustomPainter {
 
   // ----- Vertical wavefront band ---------------------------------------------
   void _paintWavefront(Canvas canvas, double reveal) {
-    final top = (1.0 - reveal) * logoHeight - 6;
-    _fill
-      ..color = Colors.white
-      ..shader = _waveShader;
-    canvas.drawRect(Rect.fromLTWH(0, top, logoWidth, 12), _fill);
+    // Swell in at the start and out at the end instead of popping.
+    final e = math.min(reveal / 0.12, (1.0 - reveal) / 0.12).clamp(0.0, 1.0);
+    if (e <= 0.01) return;
+
+    final mid = (1.0 - reveal) * logoHeight;
+    _fill.color = Colors.white;
+
+    // Wide faint halo, then the bright core.
+    _fill.shader = _waveGlowShader;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(logoWidth / 2, mid), width: logoWidth, height: 30 * e),
+        const Radius.circular(15),
+      ),
+      _fill,
+    );
+    _fill.shader = _waveShader;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(logoWidth / 2, mid), width: logoWidth, height: 10 * e),
+        const Radius.circular(5),
+      ),
+      _fill,
+    );
     _fill.shader = null;
   }
 
