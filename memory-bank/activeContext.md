@@ -1,24 +1,25 @@
 # Active Context
 
 ## Current Focus
-Resolved UI and rendering lag across Web and Mobile; verified clean release build.
+Enhanced Splash Screen with luxury transit speedometer dial, glowing telemetry, perspective road velocity grid, and fluid startup choreography.
 
-## Root Causes of Lag Identified & Fixed:
-1. **Continuous `setState` on Draggable Sheet Drag:**
-   - `NotificationListener<DraggableScrollableNotification>` in [home_screen.dart](file:///Users/johnraphaelambalong/jenrick%20%28antigravity%20projects%29/portfolio/biyahemeter/lib/features/meter/home_screen.dart) previously triggered `setState(() => _sheetExtent = next)` on every 0.01 delta, forcing 60-120 full-screen rebuilds per second during gestures.
-   - **Fix:** Switched to boolean thresholding `_isCompactSheet = notification.extent < 0.42`. Zero `setState` calls occur during dragging between min/peek/max extents; rebuilds only fire once when crossing the compact layout boundary.
-2. **Expensive Multi-Pass `BackdropFilter` Over Moving Map:**
-   - Stacked `BackdropFilter` blurs (sigma 10-20) were active in `_DashboardSheet`, `_TopStatusBar`, `_SettingsBottomSheet`, and `trip_summary_sheet.dart` directly above the map canvas.
-   - **Fix:** Replaced with hardware-accelerated translucent Apple HIG materials (`theme.colorScheme.surface.withValues(alpha: 0.88-0.96)`) with subtle ambient shadows and hairline borders (0.8px). Eliminated offscreen GPU blur passes while maintaining the exact translucent Apple aesthetic.
-3. **Unbounded Animation Repaint Invalidation:**
-   - Pulsing radar puck `_GpsPuck` was running an `AnimationController` on a continuous 2-second loop inside `MarkerLayer` without isolation.
-   - **Fix:** Wrapped `_GpsPuck` in `RepaintBoundary` so 60fps radar wave repainting is isolated to its own 36x36 layer. Wrapped `FlutterMap` in `RepaintBoundary` to prevent UI overlays from invalidating tile canvas.
-4. **Tile Cache Integration & Buffering:**
-   - Connected `MapCacheService.createTileProvider()` and added `keepBuffer: 3`, `panBuffer: 1` on `TileLayer` in [map_widget.dart](file:///Users/johnraphaelambalong/jenrick%20%28antigravity%20projects%29/portfolio/biyahemeter/lib/features/map/map_widget.dart).
+## Splash Screen Upgrade:
+1. **Instrument Speedometer Dial:**
+   - Precision circular dial with 36 ticks (major and minor) and dynamic sweep arc (from 0% to 100%) that powers on like a luxury vehicle instrument cluster.
+   - Electric cyan glow head particle that travels along the perimeter.
+2. **Elevated 3D Glass Squircle Emblem:**
+   - Centered inside the dial, the BiyaheMeter mark is mounted in a frosted glass squircle with cyan neon edge, inner highlight rim, and sweeping diagonal specular sheen reflection.
+3. **Perspective Highway Streams:**
+   - Custom-painted perspective road grid and moving velocity pulses at the horizon, establishing a direct emotional connection to travel, transit, and metering.
+4. **Dynamic Telemetry Startup Capsule:**
+   - Multi-phase startup ticker (`INITIALIZING SATELLITE GPS` -> `CALIBRATING FARE ENGINE` -> `BIYAHEMETER ARMED & READY`) with pulsing live GPS satellite beacon and numeric percentage readout.
+   - Precision hairline gradient progress track filling up to 100% over the 3.0s window.
+5. **Fluid Spring & Haptic Choreography:**
+   - Smooth spring entrance (`Curves.easeOutBack`), ambient breathing glow, tactile haptic pulses on start and lock, and forward zoom cross-dissolve departure at 3.0s.
 
 ## Verification:
 - `dart analyze`: 0 warnings, 0 errors.
-- `flutter build web --release`: Successfully built in 24.6s.
+- `flutter build web --release`: Compiled successfully in 24.8s.
 
 
 
