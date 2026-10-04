@@ -7,13 +7,15 @@ import 'package:biyahe_meter/features/onboarding/agreements_screen.dart';
 
 /// Screen 1: Splash Screen (`SplashScreen`)
 ///
-/// Luxury transit startup experience for BiyaheMeter:
-/// - Cinematic deep sapphire-obsidian transit atmosphere with perspective highway streams
-/// - High-precision instrument dial with animated speedometer arc sweep
-/// - Elevated 3D glass squircle emblem with specular light refraction
-/// - Dynamic transit telemetry status capsule (GPS sync, fare calibration, ready)
-/// - Precision hairline progress gauge synchronized to 3.0s launch sequence
-/// - Seamless cinematic cross-dissolve departure transition
+/// Neon Transit Beam Reveal & Hyperspace Zoom:
+/// - Phase 1 (0.0s – 0.65s): A high-energy neon cyan laser streak rushes horizontally across
+///   the baseline, drawing the road bar and cascading through the speed dashes with tactile haptics.
+/// - Phase 2 (0.65s – 1.45s): An electric energy wavefront sweeps upward from the road bar,
+///   illuminating "Biyahe" and snapping "METER" into focus with digital precision.
+/// - Phase 3 (1.45s – 2.40s): Full HD brand lock with a brilliant diagonal specular glint pass
+///   and breathing ambient sapphire aura.
+/// - Phase 4 (2.40s – 3.00s): Hyperspace Departure — the logo accelerates forward into the camera
+///   with radial velocity light streams, dissolving seamlessly into the Agreements screen.
 class SplashScreen extends StatefulWidget {
   final VoidCallback? onFinish;
   final AnimationController? controller; // Optional backward compatibility
@@ -32,15 +34,15 @@ class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   late final AnimationController _anim;
 
-  // Animation timeline phases (0.0s – 3.0s total)
-  late final Animation<double> _entranceScale;
-  late final Animation<double> _entranceOpacity;
-  late final Animation<double> _gaugeSweep;
-  late final Animation<double> _specularSweep;
-  late final Animation<double> _gridFlow;
-  late final Animation<double> _ambientBreathe;
-  late final Animation<double> _exitScale;
-  late final Animation<double> _exitOpacity;
+  // Timeline intervals for 3.0-second sequence
+  late final Animation<double> _horizontalBeam; // 0.0s – 0.65s
+  late final Animation<double> _verticalReveal; // 0.60s – 1.45s
+  late final Animation<double> _meterFlash;     // 1.30s – 1.65s
+  late final Animation<double> _specularSweep;  // 1.50s – 2.30s
+  late final Animation<double> _ambientBreathe; // 1.20s – 2.50s
+  late final Animation<double> _hyperspaceZoom; // 2.45s – 3.00s
+  late final Animation<double> _hyperspaceRays; // 2.40s – 3.00s
+  late final Animation<double> _exitOpacity;    // 2.85s – 3.00s
 
   Timer? _safetyTimer;
 
@@ -53,50 +55,53 @@ class _SplashScreenState extends State<SplashScreen>
       duration: const Duration(milliseconds: 3000),
     );
 
-    // 1. Entrance: Emergence with smooth spring poise (0.0s – 0.8s)
-    _entranceScale = Tween<double>(begin: 0.82, end: 1.0).animate(
+    // Phase 1: Horizontal transit beam sweeps across the road bar
+    _horizontalBeam = Tween<double>(begin: -0.15, end: 1.15).animate(
       CurvedAnimation(
         parent: _anim,
-        curve: const Interval(0.0, 0.32, curve: Curves.easeOutBack),
+        curve: const Interval(0.02, 0.24, curve: Curves.easeInOutCubic),
       ),
     );
 
-    _entranceOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+    // Phase 2: Vertical upward scan reveals "Biyahe" and "METER"
+    _verticalReveal = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(
         parent: _anim,
-        curve: const Interval(0.0, 0.24, curve: Curves.easeOut),
+        curve: const Interval(0.20, 0.50, curve: Curves.easeOutCubic),
       ),
     );
 
-    // 2. Instrument Speedometer Sweep (0.4s – 2.3s):
-    // Needle/arc powers up like a luxury vehicle instrument cluster
-    _gaugeSweep = Tween<double>(begin: 0.0, end: 1.0).animate(
+    // Phase 2b: Electric pop on "METER" header
+    _meterFlash = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 35,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 65,
+      ),
+    ]).animate(
       CurvedAnimation(
         parent: _anim,
-        curve: const Interval(0.15, 0.78, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.44, 0.56),
       ),
     );
 
-    // 3. Specular Sheen Pass (0.8s – 2.4s):
+    // Phase 3: Diagonal liquid specular glint sweeping across the letters
     _specularSweep = Tween<double>(begin: -1.2, end: 2.2).animate(
       CurvedAnimation(
         parent: _anim,
-        curve: const Interval(0.28, 0.80, curve: Curves.easeInOutCubic),
+        curve: const Interval(0.50, 0.78, curve: Curves.easeInOutCubic),
       ),
     );
 
-    // 4. Perspective Transit Grid Flow (0.0s – 3.0s):
-    _gridFlow = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _anim,
-        curve: Curves.linear,
-      ),
-    );
-
-    // 5. Ambient Light Breathing (0.6s – 2.6s):
+    // Phase 3b: Subtle ambient breathing
     _ambientBreathe = TweenSequence<double>([
       TweenSequenceItem(
-        tween: Tween<double>(begin: 0.65, end: 1.0)
+        tween: Tween<double>(begin: 0.75, end: 1.0)
             .chain(CurveTween(curve: Curves.easeInOut)),
         weight: 50,
       ),
@@ -108,22 +113,42 @@ class _SplashScreenState extends State<SplashScreen>
     ]).animate(
       CurvedAnimation(
         parent: _anim,
-        curve: const Interval(0.20, 0.88),
+        curve: const Interval(0.45, 0.82),
       ),
     );
 
-    // 6. Departure Transition (2.65s – 3.0s):
-    _exitScale = Tween<double>(begin: 1.0, end: 1.06).animate(
+    // Phase 4: Hyperspace Forward Zoom (1.0 -> 3.4x)
+    _hyperspaceZoom = Tween<double>(begin: 1.0, end: 3.4).animate(
       CurvedAnimation(
         parent: _anim,
-        curve: const Interval(0.88, 1.0, curve: Curves.easeInCubic),
+        curve: const Interval(0.80, 1.0, curve: Curves.easeInCubic),
       ),
     );
 
+    // Radial velocity light rays intensity
+    _hyperspaceRays = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: 1.0)
+            .chain(CurveTween(curve: Curves.easeOutCubic)),
+        weight: 60,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 1.0, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 40,
+      ),
+    ]).animate(
+      CurvedAnimation(
+        parent: _anim,
+        curve: const Interval(0.78, 1.0),
+      ),
+    );
+
+    // Cross-dissolve exit at the climax
     _exitOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
       CurvedAnimation(
         parent: _anim,
-        curve: const Interval(0.92, 1.0, curve: Curves.easeIn),
+        curve: const Interval(0.93, 1.0, curve: Curves.easeIn),
       ),
     );
 
@@ -135,16 +160,21 @@ class _SplashScreenState extends State<SplashScreen>
 
     _anim.forward();
 
-    // Tactile launch sensation
+    // Tactile haptic feedback cues
     if (!kIsWeb) {
-      Future.delayed(const Duration(milliseconds: 100), () {
+      Future.delayed(const Duration(milliseconds: 120), () {
         try {
           HapticFeedback.lightImpact();
         } catch (_) {}
       });
-      Future.delayed(const Duration(milliseconds: 2300), () {
+      Future.delayed(const Duration(milliseconds: 1600), () {
         try {
           HapticFeedback.selectionClick();
+        } catch (_) {}
+      });
+      Future.delayed(const Duration(milliseconds: 2450), () {
+        try {
+          HapticFeedback.mediumImpact();
         } catch (_) {}
       });
     }
@@ -193,8 +223,9 @@ class _SplashScreenState extends State<SplashScreen>
   Widget build(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
     final isTablet = size.width >= 600;
-    final emblemSize = (size.width * (isTablet ? 0.38 : 0.62)).clamp(220.0, 310.0);
-    final dialDiameter = emblemSize + 68.0;
+    // The logo has an aspect ratio of approx 2.9 : 1 (1308 x 452)
+    final logoWidth = (size.width * (isTablet ? 0.45 : 0.76)).clamp(270.0, 420.0);
+    final logoHeight = logoWidth / 2.894;
 
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
@@ -204,55 +235,55 @@ class _SplashScreenState extends State<SplashScreen>
         systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: const Color(0xFF030611),
+        backgroundColor: const Color(0xFF03050C),
         body: Stack(
           fit: StackFit.expand,
           children: [
-            // Layer 1: Atmospheric gradient backdrop
+            // Deep obsidian-to-midnight sapphire backdrop
             const DecoratedBox(
               decoration: BoxDecoration(
                 gradient: RadialGradient(
-                  center: Alignment(0.0, -0.15),
+                  center: Alignment(0.0, -0.05),
                   radius: 1.35,
                   colors: [
-                    Color(0xFF0B1938), // Midnight sapphire core
-                    Color(0xFF060D20), // Deep indigo transit layer
-                    Color(0xFF020409), // Obsidian perimeter
+                    Color(0xFF0C1B3E), // Midnight sapphire core
+                    Color(0xFF060D20), // Deep indigo transition
+                    Color(0xFF020409), // Pure obsidian perimeter
                   ],
                   stops: [0.0, 0.58, 1.0],
                 ),
               ),
             ),
 
-            // Layer 2: Perspective transit velocity streams & horizon grid
+            // Hyperspace velocity rays (ignited during Phase 4 zoom)
             AnimatedBuilder(
-              animation: _gridFlow,
+              animation: _hyperspaceRays,
               builder: (context, _) {
+                final rays = _hyperspaceRays.value;
+                if (rays <= 0.01) return const SizedBox.shrink();
+
                 return CustomPaint(
-                  painter: _TransitGridPainter(
-                    progress: _gridFlow.value,
-                    opacity: _entranceOpacity.value * _exitOpacity.value * 0.40,
-                  ),
+                  painter: _HyperspaceRaysPainter(intensity: rays),
                 );
               },
             ),
 
-            // Layer 3: Central breathing ambient bloom
+            // Central ambient light bloom behind the logo
             Center(
               child: AnimatedBuilder(
                 animation: _anim,
                 builder: (context, _) {
+                  final reveal = _verticalReveal.value;
                   final breathe = _ambientBreathe.value;
-                  final opacity = _entranceOpacity.value *
-                      _exitOpacity.value *
-                      0.35 *
-                      breathe;
+                  final zoom = _hyperspaceZoom.value;
+                  final opacity = (reveal * 0.42 * breathe * _exitOpacity.value).clamp(0.0, 1.0);
 
                   return Container(
-                    width: dialDiameter * 1.35,
-                    height: dialDiameter * 1.35,
+                    width: logoWidth * 1.6 * (zoom > 1.2 ? zoom * 0.7 : 1.0),
+                    height: logoHeight * 2.8 * (zoom > 1.2 ? zoom * 0.7 : 1.0),
                     decoration: BoxDecoration(
-                      shape: BoxShape.circle,
+                      shape: BoxShape.rectangle,
+                      borderRadius: BorderRadius.circular(logoWidth),
                       gradient: RadialGradient(
                         colors: [
                           const Color(0xFF38BDF8).withValues(alpha: opacity),
@@ -267,133 +298,148 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
 
-            // Layer 4: The Hero Instrument Dial & BiyaheMeter Emblem
+            // THE HERO: Animated BiyaheMeter Logo with Multi-Stage Energy Shaders
             Center(
               child: AnimatedBuilder(
                 animation: _anim,
                 builder: (context, _) {
-                  final currentScale = _entranceScale.value * _exitScale.value;
-                  final currentOpacity =
-                      (_entranceOpacity.value * _exitOpacity.value).clamp(0.0, 1.0);
-                  final gaugeProgress = _gaugeSweep.value;
-                  final sweep = _specularSweep.value;
+                  final beamPos = _horizontalBeam.value;
+                  final reveal = _verticalReveal.value;
+                  final meterFlash = _meterFlash.value;
+                  final specular = _specularSweep.value;
+                  final zoom = _hyperspaceZoom.value;
+                  final exitOp = _exitOpacity.value;
 
                   return Opacity(
-                    opacity: currentOpacity,
+                    opacity: exitOp,
                     child: Transform.scale(
-                      scale: currentScale,
+                      scale: zoom,
                       child: SizedBox(
-                        width: dialDiameter,
-                        height: dialDiameter,
+                        width: logoWidth,
+                        height: logoHeight,
                         child: Stack(
                           alignment: Alignment.center,
+                          clipBehavior: Clip.none,
                           children: [
-                            // 4a. Precision Circular Speedometer Instrument Dial
-                            CustomPaint(
-                              size: Size(dialDiameter, dialDiameter),
-                              painter: _SpeedometerDialPainter(
-                                progress: gaugeProgress,
-                                primaryColor: const Color(0xFF38BDF8),
-                                secondaryColor: const Color(0xFF2563EB),
-                                trackColor: Colors.white.withValues(alpha: 0.08),
-                                ticksColor: Colors.white.withValues(alpha: 0.22),
-                              ),
-                            ),
-
-                            // 4b. Elevated 3D Frosted Glass Emblem Squircle
-                            Container(
-                              width: emblemSize,
-                              height: emblemSize * 0.72,
-                              padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(26),
-                                gradient: LinearGradient(
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                  colors: [
-                                    const Color(0xFF0F1E3D).withValues(alpha: 0.90),
-                                    const Color(0xFF081024).withValues(alpha: 0.94),
+                            // 1. The Core HD Logo with Vertical Energy Wavefront Scan & Specular Sheen
+                            ShaderMask(
+                              shaderCallback: (bounds) {
+                                // Vertical reveal sweep (from y=1.0 up to 0.0) combined with specular glint
+                                return LinearGradient(
+                                  begin: Alignment.bottomCenter,
+                                  end: Alignment.topCenter,
+                                  colors: const [
+                                    Colors.white,
+                                    Colors.white,
+                                    Colors.transparent,
                                   ],
-                                ),
-                                border: Border.all(
-                                  color: const Color(0xFF38BDF8).withValues(alpha: 0.35),
-                                  width: 1.2,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: const Color(0xFF38BDF8).withValues(alpha: 0.20 * gaugeProgress),
-                                    blurRadius: 28,
-                                    spreadRadius: 2,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                  BoxShadow(
-                                    color: Colors.black.withValues(alpha: 0.55),
-                                    blurRadius: 20,
-                                    offset: const Offset(0, 10),
-                                  ),
-                                ],
-                              ),
-                              child: Stack(
-                                alignment: Alignment.center,
-                                children: [
-                                  // Subtle inner glow rim
-                                  Positioned.fill(
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(24),
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topCenter,
-                                          end: Alignment.bottomCenter,
-                                          colors: [
-                                            Colors.white.withValues(alpha: 0.12),
-                                            Colors.transparent,
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-
-                                  // High Definition BiyaheMeter Logo with Specular Sheen Pass
-                                  ShaderMask(
-                                    shaderCallback: (bounds) {
-                                      return LinearGradient(
-                                        begin: const Alignment(-0.8, -1.0),
-                                        end: const Alignment(0.8, 1.0),
-                                        colors: const [
-                                          Colors.white,
-                                          Colors.white,
-                                          Color(0xFFBAE6FD), // Luminous icy reflection
-                                          Colors.white,
-                                          Colors.white,
-                                        ],
-                                        stops: [
-                                          0.0,
-                                          (sweep - 0.22).clamp(0.0, 1.0),
-                                          sweep.clamp(0.0, 1.0),
-                                          (sweep + 0.22).clamp(0.0, 1.0),
-                                          1.0,
-                                        ],
-                                      ).createShader(bounds);
-                                    },
-                                    blendMode: BlendMode.srcATop,
-                                    child: Image.asset(
-                                      'assets/images/logo_dark_hd.png',
-                                      width: emblemSize * 0.88,
+                                  stops: [
+                                    0.0,
+                                    (reveal * 1.15).clamp(0.0, 1.0),
+                                    (reveal * 1.15 + 0.12).clamp(0.0, 1.0),
+                                  ],
+                                ).createShader(bounds);
+                              },
+                              blendMode: BlendMode.dstIn,
+                              child: ShaderMask(
+                                // Specular light reflection sweeping diagonally across the letters
+                                shaderCallback: (bounds) {
+                                  return LinearGradient(
+                                    begin: const Alignment(-0.8, -1.0),
+                                    end: const Alignment(0.8, 1.0),
+                                    colors: const [
+                                      Colors.white,
+                                      Colors.white,
+                                      Color(0xFFBAE6FD), // Luminous icy azure gleam
+                                      Colors.white,
+                                      Colors.white,
+                                    ],
+                                    stops: [
+                                      0.0,
+                                      (specular - 0.22).clamp(0.0, 1.0),
+                                      specular.clamp(0.0, 1.0),
+                                      (specular + 0.22).clamp(0.0, 1.0),
+                                      1.0,
+                                    ],
+                                  ).createShader(bounds);
+                                },
+                                blendMode: BlendMode.srcATop,
+                                child: Image.asset(
+                                  'assets/images/logo_dark_hd.png',
+                                  width: logoWidth,
+                                  height: logoHeight,
+                                  fit: BoxFit.contain,
+                                  filterQuality: FilterQuality.high,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Image.asset(
+                                      'assets/images/logo.png',
+                                      width: logoWidth,
+                                      height: logoHeight,
                                       fit: BoxFit.contain,
                                       filterQuality: FilterQuality.high,
-                                      errorBuilder: (context, error, stackTrace) {
-                                        return Image.asset(
-                                          'assets/images/logo.png',
-                                          width: emblemSize * 0.88,
-                                          fit: BoxFit.contain,
-                                          filterQuality: FilterQuality.high,
-                                        );
-                                      },
-                                    ),
-                                  ),
-                                ],
+                                    );
+                                  },
+                                ),
                               ),
                             ),
+
+                            // 2. High-Energy Horizontal Transit Beam running across the road baseline
+                            Positioned(
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              height: 18,
+                              child: CustomPaint(
+                                painter: _TransitRoadBeamPainter(
+                                  beamPosition: beamPos,
+                                  revealProgress: reveal,
+                                ),
+                              ),
+                            ),
+
+                            // 3. Leading Vertical Energy Wavefront Glow Line
+                            if (reveal > 0.02 && reveal < 0.98)
+                              Positioned(
+                                left: 0,
+                                right: 0,
+                                top: (1.0 - reveal) * logoHeight - 6,
+                                height: 12,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: [
+                                        Colors.transparent,
+                                        const Color(0xFF38BDF8).withValues(alpha: 0.65),
+                                        Colors.white.withValues(alpha: 0.90),
+                                        const Color(0xFF38BDF8).withValues(alpha: 0.65),
+                                        Colors.transparent,
+                                      ],
+                                      stops: const [0.0, 0.25, 0.50, 0.75, 1.0],
+                                    ),
+                                  ),
+                                ),
+                              ),
+
+                            // 4. "METER" Electric Pop Flash Overlay
+                            if (meterFlash > 0.01)
+                              Positioned(
+                                top: 0,
+                                left: logoWidth * 0.24,
+                                width: logoWidth * 0.32,
+                                height: logoHeight * 0.40,
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: const Color(0xFF38BDF8).withValues(alpha: meterFlash * 0.75),
+                                        blurRadius: 28,
+                                        spreadRadius: 8,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -403,164 +449,22 @@ class _SplashScreenState extends State<SplashScreen>
               ),
             ),
 
-            // Layer 5: Dynamic Transit Startup Telemetry Dock
-            Positioned(
-              left: 24,
-              right: 24,
-              bottom: (MediaQuery.paddingOf(context).bottom + 28).clamp(36.0, 72.0),
-              child: AnimatedBuilder(
-                animation: _anim,
-                builder: (context, _) {
-                  final opacity =
-                      (_entranceOpacity.value * _exitOpacity.value).clamp(0.0, 1.0);
-                  final progress = _gaugeSweep.value;
+            // Hyperspace Departure Optical Flash Bloom (at the moment of transition)
+            AnimatedBuilder(
+              animation: _anim,
+              builder: (context, _) {
+                final progress = _anim.value;
+                if (progress < 0.88) return const SizedBox.shrink();
 
-                  // Dynamic step stage
-                  String stageText;
-                  IconData stageIcon;
-                  if (progress < 0.38) {
-                    stageText = 'INITIALIZING SATELLITE GPS';
-                    stageIcon = Icons.satellite_alt_rounded;
-                  } else if (progress < 0.78) {
-                    stageText = 'CALIBRATING FARE ENGINE';
-                    stageIcon = Icons.speed_rounded;
-                  } else {
-                    stageText = 'BIYAHEMETER ARMED & READY';
-                    stageIcon = Icons.verified_rounded;
-                  }
+                // Gentle luminous white/cyan aperture flash
+                final flashIntensity = math.sin((progress - 0.88) / 0.12 * math.pi) * 0.45;
 
-                  final percent = (progress * 100).round();
-
-                  return Opacity(
-                    opacity: opacity,
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Frosted Telemetry Capsule Pill
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF0F1B35).withValues(alpha: 0.82),
-                            borderRadius: BorderRadius.circular(99),
-                            border: Border.all(
-                              color: const Color(0xFF38BDF8).withValues(alpha: 0.28),
-                              width: 0.8,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.35),
-                                blurRadius: 14,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              // Pulsing beacon dot
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: progress > 0.78
-                                      ? const Color(0xFF10B981)
-                                      : const Color(0xFF38BDF8),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: (progress > 0.78
-                                              ? const Color(0xFF10B981)
-                                              : const Color(0xFF38BDF8))
-                                          .withValues(alpha: 0.65),
-                                      blurRadius: 8,
-                                      spreadRadius: 1,
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              const SizedBox(width: 8),
-                              Icon(stageIcon, size: 14, color: const Color(0xFF93C5FD)),
-                              const SizedBox(width: 6),
-                              Text(
-                                stageText,
-                                style: const TextStyle(
-                                  color: Color(0xFFE2E8F0),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                  letterSpacing: 0.8,
-                                  fontFeatures: [FontFeature.tabularFigures()],
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Text(
-                                '$percent%',
-                                style: const TextStyle(
-                                  color: Color(0xFF38BDF8),
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w800,
-                                  fontFeatures: [FontFeature.tabularFigures()],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 14),
-
-                        // Glowing Precision Progress Track
-                        SizedBox(
-                          width: (size.width * 0.58).clamp(180.0, 260.0),
-                          child: ClipRRect(
-                            borderRadius: BorderRadius.circular(99),
-                            child: Stack(
-                              children: [
-                                // Track background
-                                Container(
-                                  height: 3.5,
-                                  color: Colors.white.withValues(alpha: 0.08),
-                                ),
-                                // Active glowing gradient fill
-                                FractionallySizedBox(
-                                  widthFactor: progress.clamp(0.02, 1.0),
-                                  child: Container(
-                                    height: 3.5,
-                                    decoration: BoxDecoration(
-                                      gradient: const LinearGradient(
-                                        colors: [
-                                          Color(0xFF2563EB),
-                                          Color(0xFF38BDF8),
-                                          Color(0xFF67E8F9),
-                                        ],
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: const Color(0xFF38BDF8).withValues(alpha: 0.75),
-                                          blurRadius: 6,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 10),
-
-                        // Subdued Luxury Brand Signature
-                        Text(
-                          'PREMIUM TRANSIT & FARE TELEMETRY',
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.32),
-                            fontSize: 9.5,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              ),
+                return IgnorePointer(
+                  child: Container(
+                    color: const Color(0xFFBAE6FD).withValues(alpha: flashIntensity.clamp(0.0, 1.0)),
+                  ),
+                );
+              },
             ),
           ],
         ),
@@ -569,212 +473,156 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-/// Custom painter for the circular automotive speedometer instrument dial.
-class _SpeedometerDialPainter extends CustomPainter {
-  final double progress;
-  final Color primaryColor;
-  final Color secondaryColor;
-  final Color trackColor;
-  final Color ticksColor;
+/// Custom painter that renders the neon laser beam racing along the road baseline
+/// and igniting the trailing speed dash pulses.
+class _TransitRoadBeamPainter extends CustomPainter {
+  final double beamPosition; // -0.15 to 1.15
+  final double revealProgress; // 0.0 to 1.0
 
-  _SpeedometerDialPainter({
-    required this.progress,
-    required this.primaryColor,
-    required this.secondaryColor,
-    required this.trackColor,
-    required this.ticksColor,
+  _TransitRoadBeamPainter({
+    required this.beamPosition,
+    required this.revealProgress,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.width / 2) - 8.0;
+    final y = size.height * 0.55;
 
-    // Classic 240-degree dial sweep from 150° (bottom-left) to 390° (bottom-right)
-    const startAngle = 150.0 * (math.pi / 180.0);
-    const totalSweepAngle = 240.0 * (math.pi / 180.0);
+    // Glowing horizontal streak trail
+    if (beamPosition > 0.0) {
+      final trailEnd = (beamPosition * size.width).clamp(0.0, size.width);
+      final trailStart = ((beamPosition - 0.45) * size.width).clamp(0.0, size.width);
 
-    // 1. Draw precision dial tick marks around the perimeter
-    const tickCount = 36;
-    for (int i = 0; i <= tickCount; i++) {
-      final t = i / tickCount;
-      final angle = startAngle + (t * totalSweepAngle);
-      final isMajor = i % 6 == 0;
-      final tickLength = isMajor ? 9.0 : 5.0;
+      if (trailEnd > trailStart) {
+        // Outer neon aura
+        final auraPaint = Paint()
+          ..shader = LinearGradient(
+            colors: [
+              Colors.transparent,
+              const Color(0xFF1D4ED8).withValues(alpha: 0.45),
+              const Color(0xFF38BDF8).withValues(alpha: 0.85),
+            ],
+          ).createShader(Rect.fromLTRB(trailStart, y - 4, trailEnd, y + 4))
+          ..strokeWidth = 6.0
+          ..strokeCap = StrokeCap.round
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
 
-      final p1 = Offset(
-        center.dx + (radius * math.cos(angle)),
-        center.dy + (radius * math.sin(angle)),
-      );
-      final p2 = Offset(
-        center.dx + ((radius - tickLength) * math.cos(angle)),
-        center.dy + ((radius - tickLength) * math.sin(angle)),
-      );
+        canvas.drawLine(Offset(trailStart, y), Offset(trailEnd, y), auraPaint);
 
-      final isPast = t <= progress;
-      final tickPaint = Paint()
-        ..color = isPast
-            ? primaryColor.withValues(alpha: isMajor ? 0.95 : 0.65)
-            : ticksColor.withValues(alpha: isMajor ? 0.30 : 0.12)
-        ..strokeWidth = isMajor ? 1.6 : 0.9
-        ..strokeCap = StrokeCap.round;
+        // Sharp core laser stroke
+        final corePaint = Paint()
+          ..shader = LinearGradient(
+            colors: [
+              Colors.transparent,
+              const Color(0xFF38BDF8),
+              Colors.white,
+            ],
+          ).createShader(Rect.fromLTRB(trailStart, y - 1.5, trailEnd, y + 1.5))
+          ..strokeWidth = 2.4
+          ..strokeCap = StrokeCap.round;
 
-      canvas.drawLine(p1, p2, tickPaint);
+        canvas.drawLine(Offset(trailStart, y), Offset(trailEnd, y), corePaint);
+
+        // Leading luminous spark particle
+        final headX = trailEnd;
+        final sparkAura = Paint()
+          ..color = const Color(0xFF38BDF8).withValues(alpha: 0.95)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8.0);
+        canvas.drawCircle(Offset(headX, y), 7.0, sparkAura);
+
+        final sparkCore = Paint()..color = Colors.white;
+        canvas.drawCircle(Offset(headX, y), 3.2, sparkCore);
+      }
     }
 
-    // 2. Background Track Arc
-    final trackPaint = Paint()
-      ..color = trackColor
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 3.0
-      ..strokeCap = StrokeCap.round;
+    // Cascading ignition of speed dashes along the right half
+    final dashStartX = size.width * 0.52;
+    final dashEndX = size.width * 0.98;
+    const dashCount = 18;
 
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius - 14.0),
-      startAngle,
-      totalSweepAngle,
-      false,
-      trackPaint,
-    );
+    for (int i = 0; i < dashCount; i++) {
+      final t = i / (dashCount - 1);
+      final dx = dashStartX + (t * (dashEndX - dashStartX));
+      final dashTrigger = 0.52 + (t * 0.46);
 
-    // 3. Active Glowing Sweep Arc
-    if (progress > 0.005) {
-      final currentSweep = totalSweepAngle * progress;
+      // Dash glows when beam passes, then settles at ambient glow
+      double dashAlpha = 0.0;
+      if (beamPosition >= dashTrigger) {
+        final dist = (beamPosition - dashTrigger).abs();
+        if (dist < 0.12) {
+          dashAlpha = (1.0 - (dist / 0.12)); // Peak flash
+        } else {
+          dashAlpha = (0.28 * revealProgress).clamp(0.0, 0.45); // Settled glow
+        }
+      }
 
-      // Glow pass
-      final glowPaint = Paint()
-        ..shader = SweepGradient(
-          startAngle: startAngle,
-          endAngle: startAngle + totalSweepAngle,
-          colors: [
-            secondaryColor.withValues(alpha: 0.15),
-            primaryColor.withValues(alpha: 0.55),
-          ],
-        ).createShader(Rect.fromCircle(center: center, radius: radius - 14.0))
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 7.0
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6.0)
-        ..strokeCap = StrokeCap.round;
+      if (dashAlpha > 0.02) {
+        final dashPaint = Paint()
+          ..color = const Color(0xFF38BDF8).withValues(alpha: dashAlpha)
+          ..strokeWidth = 2.0
+          ..strokeCap = StrokeCap.round;
 
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius - 14.0),
-        startAngle,
-        currentSweep,
-        false,
-        glowPaint,
-      );
-
-      // Core sharp stroke
-      final activePaint = Paint()
-        ..shader = SweepGradient(
-          startAngle: startAngle,
-          endAngle: startAngle + totalSweepAngle,
-          colors: [
-            secondaryColor,
-            primaryColor,
-            const Color(0xFFBAE6FD),
-          ],
-          stops: const [0.0, 0.75, 1.0],
-        ).createShader(Rect.fromCircle(center: center, radius: radius - 14.0))
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 3.5
-        ..strokeCap = StrokeCap.round;
-
-      canvas.drawArc(
-        Rect.fromCircle(center: center, radius: radius - 14.0),
-        startAngle,
-        currentSweep,
-        false,
-        activePaint,
-      );
-
-      // 4. Luminous gauge needle tip particle
-      final tipAngle = startAngle + currentSweep;
-      final tipPos = Offset(
-        center.dx + ((radius - 14.0) * math.cos(tipAngle)),
-        center.dy + ((radius - 14.0) * math.sin(tipAngle)),
-      );
-
-      final tipGlow = Paint()
-        ..color = primaryColor.withValues(alpha: 0.85)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5.0);
-      canvas.drawCircle(tipPos, 4.5, tipGlow);
-
-      final tipCore = Paint()..color = Colors.white;
-      canvas.drawCircle(tipPos, 2.2, tipCore);
+        canvas.drawLine(Offset(dx, y - 2.5), Offset(dx, y + 2.5), dashPaint);
+      }
     }
   }
 
   @override
-  bool shouldRepaint(covariant _SpeedometerDialPainter oldDelegate) {
-    return oldDelegate.progress != progress;
+  bool shouldRepaint(covariant _TransitRoadBeamPainter oldDelegate) {
+    return oldDelegate.beamPosition != beamPosition ||
+        oldDelegate.revealProgress != revealProgress;
   }
 }
 
-/// Perspective highway velocity streams flowing subtly towards the viewer.
-class _TransitGridPainter extends CustomPainter {
-  final double progress;
-  final double opacity;
+/// Custom painter for radial hyperspace velocity streams radiating from center.
+class _HyperspaceRaysPainter extends CustomPainter {
+  final double intensity;
 
-  _TransitGridPainter({required this.progress, required this.opacity});
+  _HyperspaceRaysPainter({required this.intensity});
 
   @override
   void paint(Canvas canvas, Size size) {
-    if (opacity <= 0.01) return;
+    if (intensity <= 0.01) return;
 
-    final horizonY = size.height * 0.52;
-    final centerX = size.width / 2;
+    final center = Offset(size.width / 2, size.height / 2);
+    final maxRadius = math.sqrt(size.width * size.width + size.height * size.height) / 2;
 
-    // Radiating perspective road lines
-    const lineCount = 7;
-    for (int i = 0; i < lineCount; i++) {
-      final t = i / (lineCount - 1); // 0.0 to 1.0
-      final bottomX = (size.width * -0.2) + (t * (size.width * 1.4));
+    const rayCount = 24;
+    for (int i = 0; i < rayCount; i++) {
+      final angle = (i / rayCount) * (2 * math.pi) + (i * 0.15);
+      final innerDist = 60.0 + (i % 3 * 25.0);
+      final outerDist = innerDist + ((maxRadius - innerDist) * intensity);
 
-      final linePaint = Paint()
+      final p1 = Offset(
+        center.dx + (innerDist * math.cos(angle)),
+        center.dy + (innerDist * math.sin(angle)),
+      );
+      final p2 = Offset(
+        center.dx + (outerDist * math.cos(angle)),
+        center.dy + (outerDist * math.sin(angle)),
+      );
+
+      final rayPaint = Paint()
         ..shader = LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+          begin: Alignment.center,
+          end: Alignment.bottomRight,
           colors: [
             Colors.transparent,
-            const Color(0xFF38BDF8).withValues(alpha: opacity * 0.35),
-            const Color(0xFF2563EB).withValues(alpha: opacity * 0.55),
+            const Color(0xFF38BDF8).withValues(alpha: intensity * 0.35),
+            Colors.white.withValues(alpha: intensity * 0.60),
           ],
-          stops: const [0.0, 0.45, 1.0],
-        ).createShader(Rect.fromLTRB(0, horizonY, size.width, size.height))
-        ..strokeWidth = (i == 3) ? 1.4 : 0.8;
+          stops: const [0.0, 0.6, 1.0],
+        ).createShader(Rect.fromPoints(p1, p2))
+        ..strokeWidth = (i % 4 == 0) ? 2.5 : 1.2
+        ..strokeCap = StrokeCap.round;
 
-      canvas.drawLine(
-        Offset(centerX + ((bottomX - centerX) * 0.12), horizonY),
-        Offset(bottomX, size.height),
-        linePaint,
-      );
-    }
-
-    // Moving horizontal crossbars (velocity pulses)
-    const barCount = 5;
-    for (int i = 0; i < barCount; i++) {
-      final shifted = (progress + (i / barCount)) % 1.0;
-      // Exponential curve for perspective distance compression
-      final y = horizonY + (math.pow(shifted, 2.2) * (size.height - horizonY));
-      final spread = math.pow(shifted, 1.8) * size.width * 0.85;
-
-      final barOpacity = (shifted * (1.0 - shifted) * 4.0 * opacity * 0.32).clamp(0.0, 1.0);
-      final barPaint = Paint()
-        ..color = const Color(0xFF38BDF8).withValues(alpha: barOpacity)
-        ..strokeWidth = 1.0 + (shifted * 1.5);
-
-      canvas.drawLine(
-        Offset(centerX - spread, y),
-        Offset(centerX + spread, y),
-        barPaint,
-      );
+      canvas.drawLine(p1, p2, rayPaint);
     }
   }
 
   @override
-  bool shouldRepaint(covariant _TransitGridPainter oldDelegate) {
-    return oldDelegate.progress != progress || oldDelegate.opacity != opacity;
+  bool shouldRepaint(covariant _HyperspaceRaysPainter oldDelegate) {
+    return oldDelegate.intensity != intensity;
   }
 }
 
