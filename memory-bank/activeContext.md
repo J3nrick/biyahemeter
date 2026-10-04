@@ -17,10 +17,18 @@ Implemented the user-selected **Neon Transit Beam Reveal & Hyperspace Zoom** spl
    - Radial velocity light streaks ignite.
    - The logo accelerates directly towards the camera (1.0x -> 3.4x) with an ease-in exponential curve and soft luminous aperture flash, dissolving seamlessly into the Agreements Screen at exactly 3.0s.
 
+## Splash Performance Rules (do NOT regress):
+Root causes of the earlier splash lag: two nested `ShaderMask`s over the full logo + `Opacity` (each = per-frame offscreen `saveLayer`, magnified by the 3.4x zoom), `MaskFilter.blur` glows, 24 per-ray gradient shaders per frame, full subtree rebuild every frame via `AnimatedBuilder`, and the logo being decoded on the first animated frame.
+Fix (in `premium_splash_view.dart`):
+- Entire animation is ONE `CustomPainter` with `repaint: _anim` (zero widget rebuilds); static backdrop and animated canvas in separate `RepaintBoundary`s.
+- Logo is pre-decoded to `ui.Image` BEFORE the controller starts (1.5s fallback timer).
+- No `saveLayer`: reveal = sliced `drawImageRect` + alpha; glint = clipped tinted re-draw; glows = stacked translucent shapes; rays = batched `drawPoints`.
+- Never reintroduce ShaderMask/Opacity/BackdropFilter/MaskFilter.blur on the splash.
+
 ## Deployment & Git Status:
 - Branch: `main`
-- Commit: `305e18e` (Pushed to `origin/main`)
-- Deployed to Vercel production.
+- Commit `305e18e` pushed to `origin/main` (original splash). Splash performance rewrite is committed locally; push pending user approval.
+
 
 
 
