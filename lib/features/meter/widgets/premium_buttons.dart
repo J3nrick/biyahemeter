@@ -69,7 +69,7 @@ class _PressableState extends State<Pressable> {
       label: widget.semanticLabel,
       child: AnimatedScale(
         scale: _pressed && enabled ? widget.pressedScale : 1,
-        duration: const Duration(milliseconds: 120),
+        duration: AppTheme.motion(context, const Duration(milliseconds: 120)),
         curve: Curves.easeOutCubic,
         child: Material(
           color: Colors.transparent,
@@ -423,7 +423,7 @@ class PremiumConfirmButton extends StatelessWidget {
           enabled: enabled,
           semanticLabel: enabled
               ? label
-              : (hintWhenDisabled ?? 'Complete required items first'),
+              : '$label. ${hintWhenDisabled ?? 'Complete required items first'}',
           haptic: AppHaptic.medium,
           borderRadius: BorderRadius.circular(18),
           child: AnimatedContainer(
@@ -464,11 +464,12 @@ class PremiumConfirmButton extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                AnimatedOpacity(
-                  duration: const Duration(milliseconds: 200),
-                  opacity: enabled ? 1 : 0.55,
+                // Muted on surfaceContainerHighest is ≥4.5:1; no extra fade.
+                Flexible(
                   child: Text(
                     label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.titleMedium?.copyWith(
                       color: enabled
                           ? theme.colorScheme.onPrimary
@@ -500,10 +501,13 @@ class PremiumConfirmButton extends StatelessWidget {
         ),
         if (!enabled && hintWhenDisabled != null) ...[
           const SizedBox(height: 8),
-          Text(
-            hintWhenDisabled!,
-            textAlign: TextAlign.center,
-            style: theme.textTheme.labelSmall?.copyWith(color: muted),
+          // The button's semantic label already includes this hint.
+          ExcludeSemantics(
+            child: Text(
+              hintWhenDisabled!,
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelMedium?.copyWith(color: muted),
+            ),
           ),
         ],
       ],

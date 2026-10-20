@@ -19,8 +19,10 @@ class AppTheme {
   static const Color lightWarning = Color(0xFF5B6472); // neutral, not amber
   static const Color lightDanger = Color(0xFFB42318);
   static const Color lightOnSurface = Color(0xFF121417);
-  static const Color lightOnSurfaceMuted = Color(0xFF6B7280);
+  static const Color lightOnSurfaceMuted = Color(0xFF636A77); // ≥4.5:1 on bg
   static const Color lightBorder = Color(0xFFE5E7EB);
+  // ≥3:1 against surfaces, for checkbox/radio outlines.
+  static const Color lightControlBorder = Color(0xFF868FA0);
 
   // ── Dark palette ──
   static const Color darkBackground = Color(0xFF0E1014);
@@ -32,6 +34,7 @@ class AppTheme {
   static const Color darkOnSurface = Color(0xFFF3F4F6);
   static const Color darkOnSurfaceMuted = Color(0xFF9CA3AF);
   static const Color darkBorder = Color(0xFF2A2F3A);
+  static const Color darkControlBorder = Color(0xFF6B7385);
 
   static TextTheme _textTheme(Brightness brightness) {
     final base = brightness == Brightness.dark ? darkOnSurface : lightOnSurface;
@@ -161,6 +164,16 @@ class AppTheme {
       Theme.of(context).brightness == Brightness.dark
           ? darkBorder
           : lightBorder;
+
+  /// [base] normally; zero when the OS/browser asks for reduced motion.
+  static Duration motion(BuildContext context, Duration base) =>
+      MediaQuery.disableAnimationsOf(context) ? Duration.zero : base;
+
+  /// Outline for unselected checkboxes; dividers are too faint for controls.
+  static Color controlBorderOf(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? darkControlBorder
+          : lightControlBorder;
 
   static List<BoxShadow> softShadow(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;

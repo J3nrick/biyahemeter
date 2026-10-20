@@ -7,17 +7,20 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/core/theme/theme_provider.dart';
+import 'package:biyahe_meter/core/utils/reduced_motion.dart';
 import 'package:biyahe_meter/features/fare/fare_matrix_provider.dart';
 import 'package:biyahe_meter/features/history/history_provider.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_screen.dart';
+import 'package:biyahe_meter/features/onboarding/brand_mark.dart';
 import 'package:biyahe_meter/features/onboarding/premium_splash_view.dart';
 import 'package:biyahe_meter/services/analytics_service.dart';
 import 'package:biyahe_meter/services/history_service.dart';
 import 'package:biyahe_meter/services/map_cache_service.dart';
 import 'package:biyahe_meter/services/receipt_service.dart';
 import 'package:biyahe_meter/services/sos_service.dart';
+import 'package:biyahe_meter/services/trip_live_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +48,7 @@ Future<void> main() async {
   }
 
   warmUp();
+  TripLiveService().init(meter);
 
   if (!kIsWeb) {
     try {
@@ -118,6 +122,7 @@ class BiyaheMeterApp extends StatelessWidget {
               theme: AppTheme.lightTheme,
               darkTheme: AppTheme.darkTheme,
               themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
+              builder: applyReducedMotion,
               home: const _SplashGate(),
             ),
           );
@@ -137,21 +142,45 @@ class _SplashGate extends StatefulWidget {
 
 class _SplashGateState extends State<_SplashGate>
     with SingleTickerProviderStateMixin {
-  late final AnimationController _splashController;
+  late final AnimationController _splashController = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 1250),
+  );
   bool _showAgreements = false;
+  bool _started = false;
 
   @override
   void initState() {
     super.initState();
-    _splashController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1600),
-    )..forward();
+    // Keep the launch image up until the wordmark is decoded, so the
+    // hand-off to the identical Flutter frame never blinks.
+    WidgetsBinding.instance.deferFirstFrame();
+  }
 
-    // After 1.6s animation completes, smoothly transition to AgreementsScreen
-    Future.delayed(const Duration(milliseconds: 1600), () {
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (_started) return;
+    _started = true;
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    precacheImage(const AssetImage(BrandLogo.asset), context).whenComplete(() {
+      WidgetsBinding.instance.allowFirstFrame();
       if (!mounted) return;
-      setState(() => _showAgreements = true);
+      // Nothing loads behind the splash, so leave as soon as the mark lands.
+      if (reduceMotion) {
+        _splashController.value = 1;
+        _leaveAfter(const Duration(milliseconds: 600));
+      } else {
+        _splashController.forward().whenComplete(
+          () => _leaveAfter(const Duration(milliseconds: 200)),
+        );
+      }
+    });
+  }
+
+  void _leaveAfter(Duration delay) {
+    Future.delayed(delay, () {
+      if (mounted) setState(() => _showAgreements = true);
     });
   }
 
@@ -164,14 +193,11 @@ class _SplashGateState extends State<_SplashGate>
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 400),
-      switchInCurve: Curves.easeOutCubic,
-      switchOutCurve: Curves.easeInCubic,
+      duration: Durations.medium2,
+      switchInCurve: Easing.emphasizedDecelerate,
+      switchOutCurve: Easing.emphasizedAccelerate,
       transitionBuilder: (child, animation) {
-        return FadeTransition(
-          opacity: animation,
-          child: child,
-        );
+        return FadeTransition(opacity: animation, child: child);
       },
       child: _showAgreements
           ? const AgreementsScreen(key: ValueKey('agreements'))

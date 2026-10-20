@@ -16,9 +16,7 @@
 
   <title>BiyaheMeter PH</title>
   <link rel="manifest" href="manifest.json">
-  <link rel="preload" as="image" href="splash/img/light-1x.png">
-  <link rel="preload" as="image" href="splash/img/light-2x.png">
-  <link rel="preload" as="image" href="splash/img/light-3x.png">
+  <link rel="preload" as="image" href="assets/assets/images/logo.png">
 
   <meta content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" name="viewport">
   <style id="splash-screen-style">
@@ -61,8 +59,9 @@
       z-index: 9999;
       transition: opacity 280ms ease;
     }
+    /* Same formula as BrandLogo.splashCanvasWidth so Flutter's first frame lines up. */
     #splash img {
-      width: clamp(180px, 34vmin, 320px);
+      width: clamp(260px, 72vmin, 400px);
       height: auto;
     }
     #splash.fade-out {
@@ -94,11 +93,13 @@
 </head>
 <body>
   <picture id="splash">
-    <source srcset="splash/img/light-1x.png 1x, splash/img/light-2x.png 2x, splash/img/light-3x.png 3x, splash/img/light-4x.png 4x" media="(prefers-color-scheme: light)">
-    <source srcset="splash/img/dark-1x.png 1x, splash/img/dark-2x.png 2x, splash/img/dark-3x.png 3x, splash/img/dark-4x.png 4x" media="(prefers-color-scheme: dark)">
-    <img class="center" aria-hidden="true" src="splash/img/light-1x.png" alt="">
+    <img class="center" aria-hidden="true" src="assets/assets/images/logo.png" alt="">
   </picture>
 
+  <!-- Required by maplibre_gl on web. Deferred so it never delays app start; safe
+       because the map only mounts after the splash and the agreements tap. -->
+  <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+  <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js" defer></script>
   <script src="flutter_bootstrap.js" async></script>
 </body>
 </html>

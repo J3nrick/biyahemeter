@@ -20,7 +20,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
   // Default center: Manila, Philippines
   static const ml.LatLng _defaultCenter = ml.LatLng(14.5995, 120.9842);
 
-  ml.MaplibreMapController? _mapController;
+  ml.MapLibreMapController? _mapController;
   MeterProvider? _meterProvider;
 
   /// Whether the map should automatically pan to follow the user.
@@ -94,7 +94,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     _updateRouteLine();
   }
 
-  void _onMapCreated(ml.MaplibreMapController controller) {
+  void _onMapCreated(ml.MapLibreMapController controller) {
     _mapController = controller;
     final pos = _meterProvider?.currentPosition;
     if (pos != null) {
@@ -205,7 +205,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     return Stack(
       fit: StackFit.expand,
       children: [
-        ml.MaplibreMap(
+        ml.MapLibreMap(
           initialCameraPosition: ml.CameraPosition(
             target: initialCenter,
             zoom: 15.0,
