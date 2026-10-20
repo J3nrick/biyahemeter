@@ -7,6 +7,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/core/theme/theme_provider.dart';
+import 'package:biyahe_meter/core/utils/reduced_motion.dart';
 import 'package:biyahe_meter/features/fare/fare_matrix_provider.dart';
 import 'package:biyahe_meter/features/history/history_provider.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
@@ -18,6 +19,7 @@ import 'package:biyahe_meter/services/history_service.dart';
 import 'package:biyahe_meter/services/map_cache_service.dart';
 import 'package:biyahe_meter/services/receipt_service.dart';
 import 'package:biyahe_meter/services/sos_service.dart';
+import 'package:biyahe_meter/services/trip_live_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,6 +47,7 @@ Future<void> main() async {
   }
 
   warmUp();
+  TripLiveService().init(meter);
 
   if (!kIsWeb) {
     try {
@@ -119,6 +122,7 @@ class BiyaheMeterApp extends StatelessWidget {
               darkTheme: AppTheme.darkTheme,
               themeMode: isDark ? ThemeMode.dark : ThemeMode.light,
               scrollBehavior: const MaterialScrollBehavior().copyWith(scrollbars: false),
+              builder: applyReducedMotion,
               home: const _SplashGate(),
             ),
           );

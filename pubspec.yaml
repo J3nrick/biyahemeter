@@ -54,6 +54,9 @@ dependencies:
   dio_cache_interceptor: ^4.0.7
   flutter_map_cache: ^2.1.0
   http_cache_hive_store: ^5.1.1
+  flutter_local_notifications: ^22.3.2
+  # 2.4.4+ needs permission_handler 12 or Flutter 3.41+.
+  live_activities: 2.4.3
 
 dev_dependencies:
   flutter_test:

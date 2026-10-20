@@ -199,10 +199,7 @@ class MeterProvider extends ChangeNotifier {
   Future<void> _restartTrackingStream() async {
     await _positionStream?.cancel();
     final filter = _batterySaver ? _distanceFilterMeters : 0;
-    final locationSettings = LocationSettings(
-      accuracy: LocationAccuracy.high,
-      distanceFilter: filter,
-    );
+    final locationSettings = _trackingSettings(filter);
 
     _positionStream =
         Geolocator.getPositionStream(locationSettings: locationSettings)
@@ -210,6 +207,46 @@ class MeterProvider extends ChangeNotifier {
       if (!_isRunning) return;
       _onPositionUpdate(position);
     });
+  }
+
+  /// Keeps the stream alive with the screen off: an Android location
+  /// foreground service, iOS background updates (blue status-bar pill).
+  static LocationSettings _trackingSettings(int distanceFilter) {
+    if (kIsWeb) {
+      return LocationSettings(
+        accuracy: LocationAccuracy.high,
+        distanceFilter: distanceFilter,
+      );
+    }
+    switch (defaultTargetPlatform) {
+      case TargetPlatform.android:
+        return AndroidSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: distanceFilter,
+          foregroundNotificationConfig: const ForegroundNotificationConfig(
+            notificationTitle: 'Trip in progress',
+            notificationText: 'Byahe Meter is measuring your trip.',
+            notificationChannelName: 'Trip in progress',
+            // Partial CPU wake lock so the waiting-time timer keeps ticking.
+            enableWakeLock: true,
+            setOngoing: true,
+          ),
+        );
+      case TargetPlatform.iOS:
+        return AppleSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: distanceFilter,
+          activityType: ActivityType.automotiveNavigation,
+          pauseLocationUpdatesAutomatically: false,
+          allowBackgroundLocationUpdates: true,
+          showBackgroundLocationIndicator: true,
+        );
+      default:
+        return LocationSettings(
+          accuracy: LocationAccuracy.high,
+          distanceFilter: distanceFilter,
+        );
+    }
   }
 
   void _maybeAdaptGpsThrottle() {
