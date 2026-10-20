@@ -19,7 +19,7 @@ extension LiveActivitiesAppAttributes {
 }
 
 // Same value as TripLiveService.appGroupId in lib/services/trip_live_service.dart.
-private let sharedDefaults = UserDefaults(suiteName: "group.com.example.biyahemeter")
+private let sharedDefaults = UserDefaults(suiteName: "group.ph.biyahemeter.app")
 
 // Brand accent from AppTheme: #1F4B99 light, #7AA2E3 dark (both ≥4.5:1 on their backgrounds).
 private let accent = Color(UIColor { traits in

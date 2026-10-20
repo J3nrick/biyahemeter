@@ -21,11 +21,12 @@ shared App Group `UserDefaults` → `BiyaheMeterLiveActivity.swift`.
 4. In the extension's `Info.plist` add `NSSupportsLiveActivities` = `YES`
    (Runner's `Info.plist` already has it).
 5. **Signing & Capabilities → + Capability → App Groups** on **both** `Runner` and
-   `BiyaheMeterWidget`, and add `group.com.example.biyahemeter`.
+   `BiyaheMeterWidget`, and add `group.ph.biyahemeter.app`.
    - If you change the group id, also change `TripLiveService.appGroupId` and
      `sharedDefaults` in `BiyaheMeterLiveActivity.swift`.
-   - The bundle id is still the template `com.example.biyahe_meter`; App Groups
-     need a real id registered in your Apple Developer account.
+   - Register the app id `ph.biyahemeter.app`, the extension id
+     `ph.biyahemeter.app.BiyaheMeterWidget` and the App Group in your Apple
+     Developer account first (Certificates, Identifiers & Profiles).
 6. Runner target → **Build Phases**: drag **Embed Foundation Extensions** above
    **Run Script** (Thin Binary) to avoid a "Cycle inside Runner" build error.
 7. `flutter run` on a real iPhone (Live Activities don't render in every simulator).

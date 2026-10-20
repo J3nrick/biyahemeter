@@ -10,7 +10,7 @@ import 'package:biyahe_meter/features/meter/meter_provider.dart';
 class TripLiveService {
   /// Must match the App Group enabled for Runner and the BiyaheMeterWidget
   /// extension in Xcode (see ios/BiyaheMeterWidget/README.md).
-  static const appGroupId = 'group.com.example.biyahemeter';
+  static const appGroupId = 'group.ph.biyahemeter.app';
 
   // shortcut: reuses geolocator_android's private foreground-service
   // notification id/channel (GeolocatorLocationService.java) so we update its

@@ -1,4 +1,4 @@
-package com.example.biyahe_meter
+package ph.biyahemeter.app
 
 import io.flutter.embedding.android.FlutterActivity
 
