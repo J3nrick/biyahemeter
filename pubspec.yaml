@@ -92,14 +92,17 @@ flutter_launcher_icons:
     image_path: "assets/images/logo.png"
     icon_size: 48
 
+# Plain navy launch screen (no logo): the animated Flutter splash is the
+# brand moment. Colour matches its backdrop. Regenerate with:
+#   dart run flutter_native_splash:create
 flutter_native_splash:
-  color: "#F5F6F8"
-  image: assets/images/logo.png
+  color: "#060D20"
   fullscreen: true
   android_12:
-    image: assets/images/logo.png
-    icon_background_color: "#F5F6F8"
-    color: "#F5F6F8"
+    # Android 12+ always draws an icon on the system splash; make it invisible.
+    image: assets/native_splash/transparent.png
+    icon_background_color: "#060D20"
+    color: "#060D20"
   web: false
 
   # An image asset can refer to one or more resolution-specific "variants", see
