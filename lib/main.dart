@@ -1,9 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/core/theme/theme_provider.dart';
@@ -59,12 +57,6 @@ Future<void> main() async {
 
   warmUp();
   TripLiveService().init(meter);
-
-  if (!kIsWeb) {
-    try {
-      Permission.locationWhenInUse.request();
-    } catch (_) {}
-  }
 
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(

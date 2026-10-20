@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'package:biyahe_meter/core/models/fare_preset.dart';
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/core/theme/theme_provider.dart';
@@ -1077,7 +1078,7 @@ class _SettingsBottomSheet extends StatelessWidget {
                 ),
                 const SizedBox(height: 16),
                 _SettingsGroup(
-                  title: 'Fare matrix (LTFRB)',
+                  title: 'Fare matrix',
                   description: 'Quick-switch presets recalculate fare instantly',
                   child: Consumer2<FareMatrixProvider, MeterProvider>(
                     builder: (context, matrix, liveMeter, _) {
@@ -1125,6 +1126,35 @@ class _SettingsBottomSheet extends StatelessWidget {
                               style: theme.textTheme.labelSmall
                                   ?.copyWith(color: muted),
                             ),
+                          // Store policy: government-sourced info needs its
+                          // source and a non-affiliation notice.
+                          const SizedBox(height: 6),
+                          Text(
+                            'Estimates based on publicly announced LTFRB fare '
+                            'rates. Biyahe Meter is not affiliated with or '
+                            'endorsed by the LTFRB, and is not a substitute '
+                            'for a sealed taximeter.',
+                            style: theme.textTheme.bodySmall
+                                ?.copyWith(color: muted),
+                          ),
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              style: TextButton.styleFrom(
+                                padding: EdgeInsets.zero,
+                                minimumSize: const Size(48, 40),
+                              ),
+                              icon: const Icon(
+                                CupertinoIcons.arrow_up_right_square,
+                                size: 16,
+                              ),
+                              label: const Text('Check official rates (ltfrb.gov.ph)'),
+                              onPressed: () => launchUrl(
+                                Uri.parse('https://ltfrb.gov.ph'),
+                                mode: LaunchMode.externalApplication,
+                              ),
+                            ),
+                          ),
                           SwitchListTile.adaptive(
                             contentPadding: EdgeInsets.zero,
                             secondary: Icon(
@@ -1230,18 +1260,33 @@ class _SettingsBottomSheet extends StatelessWidget {
                 const SizedBox(height: 14),
                 _SettingsGroup(
                   title: 'Safety & insights',
-                  description: 'SOS sharing, analytics, and power tools',
+                  description: 'Trip sharing, emergency call, and insights',
                   child: Column(
                     children: [
                       ListTile(
                         contentPadding: EdgeInsets.zero,
                         leading: Icon(
-                          CupertinoIcons.bolt_horizontal_circle_fill,
+                          CupertinoIcons.phone_fill,
                           color: AppTheme.dangerOf(context),
                         ),
-                        title: const Text('Share Live Route / SOS'),
+                        title: const Text('Call 911'),
                         subtitle: const Text(
-                          'Send GPS + fare status via SMS/Messenger',
+                          'Philippine national emergency hotline',
+                        ),
+                        trailing: const Icon(CupertinoIcons.chevron_right),
+                        onTap: () => launchUrl(Uri(scheme: 'tel', path: '911')),
+                      ),
+                      Divider(height: 1, color: AppTheme.borderOf(context)),
+                      ListTile(
+                        contentPadding: EdgeInsets.zero,
+                        leading: Icon(
+                          CupertinoIcons.location_circle_fill,
+                          color: theme.colorScheme.primary,
+                        ),
+                        title: const Text('Share my trip'),
+                        subtitle: const Text(
+                          'Send your location and fare to someone you trust. '
+                          'Not an emergency service.',
                         ),
                         trailing: const Icon(CupertinoIcons.share),
                         onTap: () {

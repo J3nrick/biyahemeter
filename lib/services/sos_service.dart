@@ -18,7 +18,7 @@ class SosService {
     final status = isRunning ? 'LIVE TRIP' : 'IDLE / PAUSED';
 
     final buffer = StringBuffer()
-      ..writeln('BiyaheMeter PH — Live Trip Share / SOS')
+      ..writeln('Biyahe Meter — Trip share')
       ..writeln('Status: $status')
       ..writeln('Time: $stamp')
       ..writeln('Preset: $presetName')
@@ -30,21 +30,19 @@ class SosService {
       final lng = position.longitude.toStringAsFixed(6);
       buffer
         ..writeln('GPS: $lat, $lng')
-        ..writeln('Map: https://www.google.com/maps?q=$lat,$lng')
-        ..writeln(
-          'Deep link: biyahemeter://live?lat=$lat&lng=$lng'
-          '&fare=${totalFare.toStringAsFixed(2)}&status=$status',
-        );
+        ..writeln('Map: https://www.google.com/maps?q=$lat,$lng');
     } else {
       buffer.writeln('GPS: unavailable — enable location and retry.');
     }
 
-    buffer.writeln('Please check on me / track this route.');
+    buffer
+      ..writeln('Please check on me / track this route.')
+      ..writeln('In an emergency, call 911.');
 
     await SharePlus.instance.share(
       ShareParams(
         text: buffer.toString(),
-        subject: 'BiyaheMeter PH Live Trip / SOS',
+        subject: 'Biyahe Meter trip share',
       ),
     );
   }

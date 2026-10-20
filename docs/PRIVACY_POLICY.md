@@ -7,8 +7,8 @@
 
 _Last updated: [DATE]_
 
-Biyahe Meter ("the app") is a fare meter for taxis and other rides in the
-Philippines. It is made by [DEVELOPER NAME] ("we"). This policy explains what
+Biyahe Meter ("the app") is a fare estimator for taxis and other rides in the
+Philippines. It is not a sealed taximeter and is not affiliated with the LTFRB. It is made by [DEVELOPER NAME] ("we"). This policy explains what
 the app does with your information.
 
 **Summary:** the app uses your location only to measure your trip and work out
@@ -43,22 +43,21 @@ is deleted when you clear the app's data or uninstall the app.
 
 ## Services the app connects to
 
-To show the map, the app downloads map tiles from:
+To show the map (in both light and dark mode), the app downloads map tiles from
+OpenStreetMap ([tile.openstreetmap.org](https://tile.openstreetmap.org)),
+covered by the
+[OSMF Privacy Policy](https://osmfoundation.org/wiki/Privacy_Policy).
 
-- OpenStreetMap ([tile.openstreetmap.org](https://tile.openstreetmap.org)),
-  covered by the
-  [OSMF Privacy Policy](https://osmfoundation.org/wiki/Privacy_Policy)
-- Esri ArcGIS Online ([server.arcgisonline.com](https://server.arcgisonline.com))
-  for the dark map, covered by the
-  [Esri Privacy Statement](https://www.esri.com/en-us/privacy/overview)
-
-Like any website you visit, these servers receive your IP address and which
-map tiles you requested, which reveals the area you are looking at. They do
+Like any website you visit, this server receives your IP address and which
+map tiles you requested, which reveals the area you are looking at. It does
 not receive your GPS location, your trips or any account information.
+
+The **Check official rates** link opens the LTFRB website in your browser, and
+**Call 911** opens your phone's dialer. The app sends nothing in either case.
 
 ## Sharing you choose to do
 
-When you use **Share receipt** or **SOS / Share trip**, the app opens your
+When you use **Share receipt** or **Share my trip**, the app opens your
 phone's share sheet with a receipt or message containing the trip details, your
 current coordinates and a Google Maps link. Nothing is sent until you choose
 an app and a recipient. What happens after that is up to the app you send it

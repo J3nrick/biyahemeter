@@ -3,6 +3,7 @@ import 'package:flutter_map/flutter_map.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import 'package:biyahe_meter/core/theme/app_theme.dart';
 import 'package:biyahe_meter/core/theme/theme_provider.dart';
@@ -186,26 +187,31 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
               },
             ),
             children: [
-              // ESRI Dark Gray Base for dark mode; OpenStreetMap for light mode (no API key required)
+              // OpenStreetMap tiles only (Esri tiles need an ArcGIS licence).
+              // Dark mode darkens the same tiles on-device.
+              // shortcut: OSM's public tile servers allow only light use per
+              // https://operations.osmfoundation.org/policies/tiles/ — move to
+              // Apple Maps (planned) or a keyed provider before heavy traffic.
               TileLayer(
-                urlTemplate: isDarkMode
-                    ? 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}'
-                    : 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                fallbackUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'com.biyahemeter.app',
+                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                tileBuilder: isDarkMode ? darkModeTileBuilder : null,
+                userAgentPackageName: 'ph.biyahemeter.app',
                 maxZoom: 19,
                 panBuffer: 1,
                 keepBuffer: 3,
                 tileProvider: mapCache.createTileProvider(),
               ),
 
-              // OpenStreetMap Attribution
+              // Attribution required by the OpenStreetMap licence (ODbL).
               RichAttributionWidget(
                 showFlutterMapAttribution: false,
                 attributions: [
                   TextSourceAttribution(
-                    '© OpenStreetMap, © CARTO',
-                    onTap: null,
+                    'OpenStreetMap contributors',
+                    onTap: () => launchUrl(
+                      Uri.parse('https://www.openstreetmap.org/copyright'),
+                      mode: LaunchMode.externalApplication,
+                    ),
                   ),
                 ],
               ),

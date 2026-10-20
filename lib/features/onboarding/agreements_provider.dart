@@ -3,7 +3,8 @@ import 'package:hive/hive.dart';
 
 class AgreementsProvider extends ChangeNotifier {
   /// Bump when the agreement text changes so everyone re-accepts.
-  static const termsVersion = 1;
+  // v2: estimate/taximeter, background location and driving-safety wording.
+  static const termsVersion = 2;
   static const _acceptedVersionKey = 'agreements_accepted_version';
 
   final Box<dynamic>? _store;

@@ -1,11 +1,11 @@
 {
-    "name": "biyahe_meter",
-    "short_name": "biyahe_meter",
+    "name": "Biyahe Meter",
+    "short_name": "Biyahe Meter",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Fare estimator and trip calculator for rides in the Philippines.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

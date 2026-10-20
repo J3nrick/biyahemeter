@@ -16,8 +16,11 @@ shared App Group `UserDefaults` → `BiyaheMeterLiveActivity.swift`.
    iOS 16.1 or later. When asked, *don't* activate the new scheme.
 3. Xcode creates its own sample files in `ios/BiyaheMeterWidget/`. Delete the
    generated `*.swift` files **except** keep its `Info.plist` and asset catalog, and add
-   the two files from this folder (`BiyaheMeterLiveActivity.swift`,
-   `BiyaheMeterWidgetBundle.swift`) to the **BiyaheMeterWidget** target.
+   the three files from this folder (`BiyaheMeterLiveActivity.swift`,
+   `BiyaheMeterWidgetBundle.swift` and `PrivacyInfo.xcprivacy`) to the
+   **BiyaheMeterWidget** target. The privacy manifest is required: App Store
+   Connect rejects uploads whose extension uses `UserDefaults` without one
+   (ITMS-91053). Check that it appears under the target's *Copy Bundle Resources*.
 4. In the extension's `Info.plist` add `NSSupportsLiveActivities` = `YES`
    (Runner's `Info.plist` already has it).
 5. **Signing & Capabilities → + Capability → App Groups** on **both** `Runner` and

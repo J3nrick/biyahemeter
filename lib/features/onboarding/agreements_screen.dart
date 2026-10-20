@@ -206,7 +206,7 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
                     _AgreementCard(
                       title: 'Fare Estimates & Terms',
                       description:
-                          'Fare calculations follow standard rates based on distance and waiting time. Actual traffic conditions may vary.',
+                          'Fares are estimates based on distance and waiting time, and actual traffic may change them. Biyahe Meter is not a substitute for a sealed, LTFRB-approved taximeter.',
                       value: _fareEstimatesAccepted,
                       cardBg: cardBg,
                       cardBorder: cardBorder,
@@ -223,7 +223,7 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
                     _AgreementCard(
                       title: 'Route & Data Privacy',
                       description:
-                          'GPS location is accessed exclusively in real-time to compute accurate transit distance. No personal tracking data is stored.',
+                          'Your location measures trip distance, also in the background while a trip runs. Trips are saved only on this phone and are never sent to us.',
                       value: _routePrivacyAccepted,
                       cardBg: cardBg,
                       cardBorder: cardBorder,
@@ -240,7 +240,7 @@ class _AgreementsScreenState extends State<AgreementsScreen> {
                     _AgreementCard(
                       title: 'Responsible Rate Use',
                       description:
-                          'Calculations serve as transparent fare estimates. Ensure adherence to official transport regulations during your ride.',
+                          'Follow official transport regulations. If you drive, set up your trip before moving and do not use the app while the vehicle is in motion.',
                       value: _responsibleRateAccepted,
                       cardBg: cardBg,
                       cardBorder: cardBorder,

@@ -30,7 +30,7 @@ class FarePreset {
     FarePreset(
       id: FarePresetId.regularTaxi,
       name: 'Regular Taxi',
-      description: 'LTFRB flagdown + ₱/km + waiting',
+      description: 'Flagdown + ₱/km + waiting, based on LTFRB taxi rates',
       flagdown: 45.0,
       ratePerKm: 13.50,
       waitingPerMinute: 2.0,
