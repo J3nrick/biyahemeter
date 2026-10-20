@@ -10,6 +10,7 @@ import 'package:biyahe_meter/core/theme/theme_provider.dart';
 import 'package:biyahe_meter/core/utils/reduced_motion.dart';
 import 'package:biyahe_meter/features/fare/fare_matrix_provider.dart';
 import 'package:biyahe_meter/features/history/history_provider.dart';
+import 'package:biyahe_meter/features/meter/home_screen.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_provider.dart';
 import 'package:biyahe_meter/features/onboarding/agreements_screen.dart';
@@ -32,7 +33,17 @@ Future<void> main() async {
   final historyService = HistoryService();
   final mapCache = MapCacheService();
   final fareMatrix = FareMatrixProvider();
-  final meter = MeterProvider()..applyFareMatrix(fareMatrix);
+  final meter = MeterProvider();
+  Box<dynamic>? appState;
+  try {
+    appState = await Hive.openBox('app_state');
+    meter.restoreFrom(appState);
+    fareMatrix
+      ..selectPreset(meter.activePreset.id)
+      ..setDiscountEnabled(meter.discountEnabled);
+  } catch (_) {}
+  meter.applyFareMatrix(fareMatrix);
+  final agreements = AgreementsProvider(appState);
   final historyProvider = HistoryProvider(historyService, AnalyticsService());
 
   // Kick off non-blocking init in background
@@ -64,6 +75,7 @@ Future<void> main() async {
 
   runApp(
     BiyaheMeterApp(
+      agreements: agreements,
       fareMatrix: fareMatrix,
       meter: meter,
       history: historyProvider,
@@ -73,6 +85,7 @@ Future<void> main() async {
 }
 
 class BiyaheMeterApp extends StatelessWidget {
+  final AgreementsProvider agreements;
   final FareMatrixProvider fareMatrix;
   final MeterProvider meter;
   final HistoryProvider history;
@@ -80,6 +93,7 @@ class BiyaheMeterApp extends StatelessWidget {
 
   const BiyaheMeterApp({
     super.key,
+    required this.agreements,
     required this.fareMatrix,
     required this.meter,
     required this.history,
@@ -91,7 +105,7 @@ class BiyaheMeterApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
-        ChangeNotifierProvider(create: (_) => AgreementsProvider()),
+        ChangeNotifierProvider.value(value: agreements),
         ChangeNotifierProvider.value(value: fareMatrix),
         ChangeNotifierProvider.value(value: meter),
         ChangeNotifierProvider.value(value: history),
@@ -132,7 +146,7 @@ class BiyaheMeterApp extends StatelessWidget {
   }
 }
 
-/// Seamless splash -> onboarding agreements transition gate.
+/// Seamless splash -> agreements (or straight to home once accepted) gate.
 class _SplashGate extends StatefulWidget {
   const _SplashGate();
 
@@ -141,7 +155,15 @@ class _SplashGate extends StatefulWidget {
 }
 
 class _SplashGateState extends State<_SplashGate> {
-  bool _showAgreements = false;
+  bool _splashDone = false;
+  // Read once: accepting later must not swap the agreements screen for home.
+  late final bool _accepted;
+
+  @override
+  void initState() {
+    super.initState();
+    _accepted = context.read<AgreementsProvider>().allAccepted;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -164,16 +186,19 @@ class _SplashGateState extends State<_SplashGate> {
         }
         return FadeTransition(opacity: animation, child: child);
       },
-      child: _showAgreements
-          ? const AgreementsScreen(key: ValueKey('agreements'))
-          : SplashScreen(
+      child: !_splashDone
+          ? SplashScreen(
               key: const ValueKey('splash'),
+              quick: _accepted,
               onFinish: () {
                 if (mounted) {
-                  setState(() => _showAgreements = true);
+                  setState(() => _splashDone = true);
                 }
               },
-            ),
+            )
+          : _accepted
+              ? const HomeScreen(key: ValueKey('home'))
+              : const AgreementsScreen(key: ValueKey('agreements')),
     );
   }
 }

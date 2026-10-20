@@ -1,6 +1,20 @@
 import 'package:flutter/foundation.dart';
+import 'package:hive/hive.dart';
 
 class AgreementsProvider extends ChangeNotifier {
+  /// Bump when the agreement text changes so everyone re-accepts.
+  static const termsVersion = 1;
+  static const _acceptedVersionKey = 'agreements_accepted_version';
+
+  final Box<dynamic>? _store;
+
+  /// Starts fully accepted if [store] remembers acceptance of [termsVersion].
+  AgreementsProvider([this._store]) {
+    if (_store?.get(_acceptedVersionKey) == termsVersion) {
+      _acceptedTerms = _acceptedPrivacy = _verifiedGasData = true;
+    }
+  }
+
   bool _acceptedTerms = false;
   bool _acceptedPrivacy = false;
   bool _verifiedGasData = false;
@@ -32,6 +46,7 @@ class AgreementsProvider extends ChangeNotifier {
     _acceptedTerms = true;
     _acceptedPrivacy = true;
     _verifiedGasData = true;
+    _store?.put(_acceptedVersionKey, termsVersion);
     notifyListeners();
   }
 }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:hive/hive.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:biyahe_meter/core/models/fare_preset.dart';
@@ -38,6 +39,14 @@ class MeterProvider extends ChangeNotifier {
 
   StreamSubscription<Position>? _positionStream;
   Timer? _waitingTimer;
+  Timer? _snapshotTimer;
+
+  // Survives app restarts; null until [restoreFrom] (e.g. in tests).
+  Box<dynamic>? _store;
+  static const _settingsKey = 'meter_settings';
+  static const _tripKey = 'meter_trip';
+  @visibleForTesting
+  static Duration snapshotInterval = const Duration(seconds: 5);
 
   // Getters
   bool get isRunning => _isRunning;
@@ -79,6 +88,7 @@ class MeterProvider extends ChangeNotifier {
     if (value > 0) {
       _kmPerLiter = value;
       _recalculateFare();
+      _saveSettings();
       notifyListeners();
     }
   }
@@ -87,6 +97,7 @@ class MeterProvider extends ChangeNotifier {
     if (value > 0) {
       _gasPricePerLiter = value;
       _recalculateFare();
+      _saveSettings();
       notifyListeners();
     }
   }
@@ -95,6 +106,7 @@ class MeterProvider extends ChangeNotifier {
     if (value >= 0) {
       _baseFare = value;
       _recalculateFare();
+      _saveSettings();
       notifyListeners();
     }
   }
@@ -105,6 +117,7 @@ class MeterProvider extends ChangeNotifier {
     if (_isRunning) {
       unawaited(_restartTrackingStream());
     }
+    _saveSettings();
     notifyListeners();
   }
 
@@ -116,7 +129,78 @@ class MeterProvider extends ChangeNotifier {
       _baseFare = _activePreset.flagdown;
     }
     _recalculateFare();
+    _saveSettings();
     notifyListeners();
+  }
+
+  /// Loads saved settings and any trip that was running when the app died,
+  /// then keeps [store] up to date. A restored trip comes back paused
+  /// ([canResumeTrip]) so the user resumes it explicitly.
+  void restoreFrom(Box<dynamic> store) {
+    _store = store;
+    final settings = store.get(_settingsKey);
+    if (settings is Map) {
+      double? num_(String k) => (settings[k] as num?)?.toDouble();
+      _kmPerLiter = num_('kmPerLiter') ?? _kmPerLiter;
+      _gasPricePerLiter = num_('gasPricePerLiter') ?? _gasPricePerLiter;
+      _baseFare = num_('baseFare') ?? _baseFare;
+      final presetId =
+          FarePresetId.values.asNameMap()[settings['presetId'] as String?];
+      if (presetId != null) _activePreset = FarePreset.byId(presetId);
+      _discountEnabled = settings['discountEnabled'] as bool? ?? false;
+      _batterySaver = settings['batterySaver'] as bool? ?? true;
+    }
+
+    final trip = store.get(_tripKey);
+    if (trip is Map && trip['isRunning'] == true) {
+      LatLng? point(String lat, String lng) => trip[lat] is num
+          ? LatLng((trip[lat] as num).toDouble(), (trip[lng] as num).toDouble())
+          : null;
+      _distanceKm = (trip['distanceKm'] as num?)?.toDouble() ?? 0;
+      _waitingMinutes = (trip['waitingMinutes'] as num?)?.toDouble() ?? 0;
+      final startedMs = trip['tripStartedAt'] as int?;
+      _tripStartedAt = startedMs == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(startedMs);
+      final route = (trip['route'] as List?)?.cast<num>() ?? const <num>[];
+      _routePoints
+        ..clear()
+        ..addAll([
+          for (var i = 0; i + 1 < route.length; i += 2)
+            LatLng(route[i].toDouble(), route[i + 1].toDouble()),
+        ]);
+      _lastPosition = point('lastLat', 'lastLng');
+      _currentPosition = _lastPosition;
+      _tripStartPosition = point('startLat', 'startLng');
+    }
+    _recalculateFare();
+    notifyListeners();
+  }
+
+  void _saveSettings() {
+    _store?.put(_settingsKey, {
+      'kmPerLiter': _kmPerLiter,
+      'gasPricePerLiter': _gasPricePerLiter,
+      'baseFare': _baseFare,
+      'presetId': _activePreset.id.name,
+      'discountEnabled': _discountEnabled,
+      'batterySaver': _batterySaver,
+    });
+  }
+
+  void _saveTrip() {
+    _store?.put(_tripKey, {
+      'isRunning': _isRunning,
+      'distanceKm': _distanceKm,
+      'waitingMinutes': _waitingMinutes,
+      'tripStartedAt': _tripStartedAt?.millisecondsSinceEpoch,
+      // Flat [lat, lng, ...] keeps the snapshot small for long trips.
+      'route': [for (final p in _routePoints) ...[p.latitude, p.longitude]],
+      'lastLat': _lastPosition?.latitude,
+      'lastLng': _lastPosition?.longitude,
+      'startLat': _tripStartPosition?.latitude,
+      'startLng': _tripStartPosition?.longitude,
+    });
   }
 
   Future<bool> _ensurePermissions() async {
@@ -194,6 +278,9 @@ class MeterProvider extends ChangeNotifier {
         notifyListeners();
       }
     });
+
+    _snapshotTimer?.cancel();
+    _snapshotTimer = Timer.periodic(snapshotInterval, (_) => _saveTrip());
   }
 
   Future<void> _restartTrackingStream() async {
@@ -317,6 +404,9 @@ class MeterProvider extends ChangeNotifier {
     _positionStream = null;
     _waitingTimer?.cancel();
     _waitingTimer = null;
+    _snapshotTimer?.cancel();
+    _snapshotTimer = null;
+    _saveTrip();
     WakelockPlus.disable();
     notifyListeners();
   }
@@ -343,6 +433,7 @@ class MeterProvider extends ChangeNotifier {
   void dispose() {
     _positionStream?.cancel();
     _waitingTimer?.cancel();
+    _snapshotTimer?.cancel();
     WakelockPlus.disable();
     super.dispose();
   }
