@@ -50,6 +50,8 @@ class TripLiveService {
           appGroupId: appGroupId,
           requireNotificationPermission: false,
         );
+        // A killed app can leave its Lock Screen card behind for hours.
+        await _liveActivities.endAllActivities();
       }
       _ready = true;
       meter.addListener(() => _sync(meter));

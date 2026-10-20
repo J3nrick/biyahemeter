@@ -23,9 +23,9 @@
 		<key>CFBundleVersion</key>
 		<string>$(FLUTTER_BUILD_NUMBER)</string>
 		<key>NSLocationWhenInUseUsageDescription</key>
-		<string>Byahe Meter uses your location to measure trip distance and calculate the fare.</string>
+		<string>Biyahe Meter uses your location to measure trip distance and calculate the fare.</string>
 		<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-		<string>Byahe Meter keeps measuring your trip while the phone is locked, so the fare stays accurate.</string>
+		<string>Biyahe Meter keeps measuring your trip while the phone is locked, so the fare stays accurate.</string>
 		<key>UIBackgroundModes</key>
 		<array>
 			<string>location</string>
@@ -34,6 +34,9 @@
 		<true/>
 		<key>NSSupportsLiveActivitiesFrequentUpdates</key>
 		<true/>
+		<!-- Only standard HTTPS is used, which is exempt from export compliance. -->
+		<key>ITSAppUsesNonExemptEncryption</key>
+		<false/>
 		<key>LSRequiresIPhoneOS</key>
 		<true/>
 		<key>UILaunchStoryboardName</key>

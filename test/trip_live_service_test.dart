@@ -85,4 +85,43 @@ void main() {
     await settle();
     expect(calls, isEmpty);
   });
+
+  test('iOS: clears stale cards, then mirrors the trip in a Live Activity',
+      () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.iOS;
+    const la = MethodChannel('live_activities');
+    final laCalls = <MethodCall>[];
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(la, (call) async {
+          laCalls.add(call);
+          return call.method == 'areActivitiesEnabled' ? true : null;
+        });
+    addTearDown(
+      () => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(la, null),
+    );
+    List<String> methods() => laCalls.map((c) => c.method).toList();
+
+    final meter = _FakeMeter();
+    await TripLiveService().init(meter);
+    expect(methods(), ['init', 'endAllActivities']);
+
+    meter
+      ..running = true
+      ..emit();
+    await settle();
+    final update = laCalls.lastWhere(
+      (c) => c.method == 'createOrUpdateActivity',
+    );
+    final data = (update.arguments as Map)['data'] as Map;
+    expect(data['fare'], '₱45.00');
+    expect(data.keys, containsAll(['distance', 'elapsed', 'preset']));
+
+    meter
+      ..running = false
+      ..emit();
+    await settle();
+    expect(methods().last, 'endActivity');
+    expect(calls, isEmpty); // no Android notifications on iOS
+  });
 }
