@@ -8,26 +8,23 @@ import 'package:biyahe_meter/features/onboarding/agreements_screen.dart';
 
 /// Screen 1: Splash Screen (`SplashScreen`)
 ///
-/// Neon Transit Beam Reveal & Hyperspace Zoom:
-/// - Phase 1 (0.0s – 0.65s): A high-energy neon cyan laser streak rushes horizontally across
-///   the baseline, drawing the road bar and cascading through the speed dashes with tactile haptics.
-/// - Phase 2 (0.65s – 1.45s): An electric energy wavefront sweeps upward from the road bar,
-///   illuminating "Biyahe" and snapping "METER" into focus with digital precision.
-/// - Phase 3 (1.45s – 2.40s): Full HD brand lock with a brilliant diagonal specular glint pass
-///   and breathing ambient sapphire aura.
-/// - Phase 4 (2.40s – 3.00s): Hyperspace Departure — the logo accelerates forward into the camera
-///   with radial velocity light streams, dissolving seamlessly into the Agreements screen.
+/// "Meter Lock" — a fare-meter badge finds its GPS fix, the brand types itself
+/// in, the road drives across, then the badge zooms through into the app:
+/// - 0.00–0.90s  GPS seed dot pops, ping rings ripple out, the badge blooms
+///               and its cyan meter arc ticks up around a ₱ sign.
+/// - 0.95–1.95s  "Biyahe" reveals letter by letter, "METER" clicks in, the
+///               road streak drives in left→right with a light at its head.
+/// - 1.80–2.15s  Tagline settles in. Brief hold.
+/// - 2.45–3.20s  Text falls away, the badge pulls back, then zooms through
+///               the screen (its navy disc fills it) into the Agreements screen.
 ///
-/// PERFORMANCE ARCHITECTURE (why this is smooth):
-/// - The whole animation is ONE [CustomPainter] repainted directly by the
-///   [AnimationController] (`repaint:`), so there are zero widget rebuilds per frame.
-/// - The logo is decoded into a `ui.Image` BEFORE the clock starts, so no frame ever
-///   pays for image decoding / texture upload.
-/// - No `saveLayer` anywhere: no ShaderMask, no Opacity, no BackdropFilter, no blur
-///   `MaskFilter`. Reveal is done with sliced `drawImageRect` + alpha; the glint is a
-///   clipped, tinted re-draw of the logo. Glows are layered translucent shapes.
-/// - Rays are batched into a handful of `drawPoints` calls instead of 24 shader paints.
-/// - Static backdrop and animated canvas live in separate [RepaintBoundary] layers.
+/// PERFORMANCE ARCHITECTURE (see memory-bank/activeContext.md, do not regress):
+/// - ONE [CustomPainter] repainted by the controller (`repaint:`): zero widget
+///   rebuilds per frame. Static backdrop on its own [RepaintBoundary].
+/// - Logo decoded to `ui.Image` BEFORE the clock starts; shaders warmed offscreen.
+/// - No `saveLayer`: no ShaderMask/Opacity/BackdropFilter/blur MaskFilter.
+///   Letter reveal = sliced `drawImageRect` + paint alpha; glows = cached
+///   radial-gradient shaders drawn under a canvas transform.
 class SplashScreen extends StatefulWidget {
   final VoidCallback? onFinish;
   final AnimationController? controller; // Optional backward compatibility
@@ -45,6 +42,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   static const _logoAsset = 'assets/images/logo_dark_hd.png';
+  static const _total = Duration(milliseconds: 3200);
 
   late final AnimationController _anim;
 
@@ -57,15 +55,13 @@ class _SplashScreenState extends State<SplashScreen>
 
   Timer? _startFallback;
   Timer? _safetyTimer;
+  final List<Timer> _haptics = [];
 
   @override
   void initState() {
     super.initState();
 
-    _anim = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 3000),
-    );
+    _anim = AnimationController(vsync: this, duration: _total);
 
     _anim.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
@@ -100,17 +96,18 @@ class _SplashScreenState extends State<SplashScreen>
     stream.addListener(_listener!);
   }
 
-  /// The logo has an aspect ratio of approx 2.9 : 1 (1308 x 452).
-  static (double, double) _logoDims(Size size) {
-    final isTablet = size.width >= 600;
-    final w = (size.width * (isTablet ? 0.45 : 0.76)).clamp(270.0, 420.0);
-    return (w, w / 2.894);
-  }
+  TextStyle get _taglineStyle =>
+      (Theme.of(context).textTheme.bodyMedium ?? const TextStyle()).copyWith(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        letterSpacing: 0.2,
+        height: 1.2,
+        color: const Color(0xFFB8C4D9), // ≥7:1 on the navy backdrop
+      );
 
   /// Render a handful of frames offscreen (tiny, 1/4 scale) BEFORE the clock
-  /// starts. This makes the GPU compile every gradient / clip / image pipeline
-  /// the animation uses, so the first real appearance of each effect is not a
-  /// frame-time spike. Capped so it can never delay the splash noticeably.
+  /// starts, so every gradient / clip / image pipeline is compiled before its
+  /// first real appearance. Capped so it can never delay the splash noticeably.
   Future<void> _warmUpThenBegin() async {
     if (_started || _warming) return;
     _warming = true;
@@ -125,23 +122,22 @@ class _SplashScreenState extends State<SplashScreen>
     final img = _logoInfo?.image;
     if (img == null) return;
     final size = MediaQuery.sizeOf(context);
-    final (lw, lh) = _logoDims(size);
     const scale = 0.25;
     final w = math.max(1, (size.width * scale).ceil());
     final h = math.max(1, (size.height * scale).ceil());
+    final painter = _SplashPainter(
+      anim: const AlwaysStoppedAnimation<double>(0),
+      image: img,
+      taglineStyle: _taglineStyle,
+    );
 
-    // One time-point inside each effect: beam, reveal+wavefront, meter flash,
-    // glint, hyperspace rays/zoom, departure flash.
-    for (final t in const [0.10, 0.28, 0.50, 0.62, 0.74, 0.88, 0.96]) {
+    // One time-point inside each effect: seed + pings, bloom + arc, letters +
+    // road head, tagline, exit, zoom-through.
+    for (final t in const [0.05, 0.20, 0.36, 0.50, 0.62, 0.80, 0.95]) {
       final recorder = ui.PictureRecorder();
       final canvas = Canvas(recorder);
       canvas.scale(scale);
-      _SplashPainter(
-        anim: AlwaysStoppedAnimation<double>(t),
-        image: img,
-        logoWidth: lw,
-        logoHeight: lh,
-      ).paint(canvas, size);
+      painter.paintAt(canvas, size, t);
       final picture = recorder.endRecording();
       final out = await picture.toImage(w, h);
       out.dispose();
@@ -155,32 +151,33 @@ class _SplashScreenState extends State<SplashScreen>
     _startFallback?.cancel();
     _startFallback = null;
 
+    // Reduced motion: show the composed brand frame, no zoom, no haptics.
+    if (MediaQuery.disableAnimationsOf(context)) {
+      _anim.value = _SplashPainter.composedFrame;
+      _safetyTimer = Timer(const Duration(milliseconds: 1000), _proceed);
+      return;
+    }
+
     _anim.forward();
 
-    // Tactile haptic feedback cues
+    // Tactile cues: GPS fix, METER clicks in, zoom-through.
     if (!kIsWeb) {
-      Future.delayed(const Duration(milliseconds: 120), () {
-        if (!mounted) return;
-        try {
-          HapticFeedback.lightImpact();
-        } catch (_) {}
-      });
-      Future.delayed(const Duration(milliseconds: 1600), () {
-        if (!mounted) return;
-        try {
-          HapticFeedback.selectionClick();
-        } catch (_) {}
-      });
-      Future.delayed(const Duration(milliseconds: 2450), () {
-        if (!mounted) return;
-        try {
-          HapticFeedback.mediumImpact();
-        } catch (_) {}
-      });
+      void at(int ms, Future<void> Function() fire) {
+        _haptics.add(Timer(Duration(milliseconds: ms), () {
+          if (!mounted) return;
+          try {
+            fire();
+          } catch (_) {}
+        }));
+      }
+
+      at(140, HapticFeedback.lightImpact);
+      at(1500, HapticFeedback.selectionClick);
+      at(2740, HapticFeedback.mediumImpact);
     }
 
     // Safety fallback
-    _safetyTimer = Timer(const Duration(milliseconds: 3300), () {
+    _safetyTimer = Timer(_total + const Duration(milliseconds: 300), () {
       if (mounted) _proceed();
     });
   }
@@ -216,6 +213,9 @@ class _SplashScreenState extends State<SplashScreen>
   void dispose() {
     _startFallback?.cancel();
     _safetyTimer?.cancel();
+    for (final t in _haptics) {
+      t.cancel();
+    }
     if (_listener != null) _stream?.removeListener(_listener!);
     _logoInfo?.dispose();
     _anim.dispose();
@@ -224,9 +224,6 @@ class _SplashScreenState extends State<SplashScreen>
 
   @override
   Widget build(BuildContext context) {
-    final size = MediaQuery.sizeOf(context);
-    final (logoWidth, logoHeight) = _logoDims(size);
-
     return AnnotatedRegion<SystemUiOverlayStyle>(
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
@@ -236,41 +233,46 @@ class _SplashScreenState extends State<SplashScreen>
       ),
       child: Scaffold(
         backgroundColor: const Color(0xFF03050C),
-        body: Stack(
-          fit: StackFit.expand,
-          children: [
-            // Static backdrop: rasterised once on its own layer, never repainted.
-            const RepaintBoundary(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: RadialGradient(
-                    center: Alignment(0.0, -0.05),
-                    radius: 1.35,
-                    colors: [
-                      Color(0xFF0C1B3E), // Midnight sapphire core
-                      Color(0xFF060D20), // Deep indigo transition
-                      Color(0xFF020409), // Pure obsidian perimeter
-                    ],
-                    stops: [0.0, 0.58, 1.0],
+        body: Semantics(
+          container: true,
+          label: 'Biyahe Meter. Know your fare. Plan your byahe.',
+          child: ExcludeSemantics(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Static backdrop (matches web/index.html's loader), rasterised once.
+                const RepaintBoundary(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: RadialGradient(
+                        center: Alignment(0.0, -0.05),
+                        radius: 1.35,
+                        colors: [
+                          Color(0xFF0C1B3E), // Midnight sapphire core
+                          Color(0xFF060D20), // Deep indigo transition
+                          Color(0xFF020409), // Pure obsidian perimeter
+                        ],
+                        stops: [0.0, 0.58, 1.0],
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
 
-            // The entire animation: one painter, repainted by the controller only.
-            RepaintBoundary(
-              child: CustomPaint(
-                painter: _SplashPainter(
-                  anim: _anim,
-                  image: _logoInfo?.image,
-                  logoWidth: logoWidth,
-                  logoHeight: logoHeight,
+                // The entire animation: one painter, repainted by the controller only.
+                RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _SplashPainter(
+                      anim: _anim,
+                      image: _logoInfo?.image,
+                      taglineStyle: _taglineStyle,
+                    ),
+                    isComplex: true,
+                    willChange: true,
+                  ),
                 ),
-                isComplex: true,
-                willChange: true,
-              ),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -278,32 +280,21 @@ class _SplashScreenState extends State<SplashScreen>
 }
 
 // ---------------------------------------------------------------------------
-// Timeline helpers
+// Timeline helpers (all times in ms of the 3200 ms clock)
 // ---------------------------------------------------------------------------
 
-/// Eased 0..1 progress of [t] across the window [a]..[b].
-double _seg(double t, double a, double b, [Curve curve = Curves.linear]) {
-  return curve.transform(((t - a) / (b - a)).clamp(0.0, 1.0));
+const double _totalMs = 3200;
+
+/// Eased 0..1 progress of the current time across [aMs]..[bMs].
+double _seg(double ms, double aMs, double bMs, [Curve curve = Curves.linear]) {
+  return curve.transform(((ms - aMs) / (bMs - aMs)).clamp(0.0, 1.0));
 }
 
-/// Gentle start, long soft landing: used for the upward reveal so it flows out
-/// of the laser instead of snapping on.
-const Curve _softOut = Cubic(0.30, 0.0, 0.15, 1.0);
+/// Mild overshoot for the badge bloom (≈4%), never springy.
+const Curve _bloom = Cubic(0.34, 1.25, 0.64, 1.0);
 
-/// Up-then-down pulse across [a]..[b], peaking at [peak] (0..1 of the window).
-double _pulse(
-  double t,
-  double a,
-  double b, {
-  required double peak,
-  Curve up = Curves.easeOut,
-  Curve down = Curves.easeIn,
-}) {
-  if (t <= a || t >= b) return 0.0;
-  final u = (t - a) / (b - a);
-  if (u < peak) return up.transform(u / peak);
-  return 1.0 - down.transform((u - peak) / (1.0 - peak));
-}
+/// Slow start, then accelerates hard: the zoom-through.
+const Curve _launch = Cubic(0.72, 0.0, 0.86, 0.0);
 
 // ---------------------------------------------------------------------------
 // Single-pass splash painter
@@ -312,409 +303,334 @@ double _pulse(
 class _SplashPainter extends CustomPainter {
   final Animation<double> anim;
   final ui.Image? image;
-  final double logoWidth;
-  final double logoHeight;
+  final TextStyle taglineStyle;
 
   _SplashPainter({
     required this.anim,
     required this.image,
-    required this.logoWidth,
-    required this.logoHeight,
+    required this.taglineStyle,
   }) : super(repaint: anim);
 
+  /// Animation value where badge, wordmark and tagline are all fully in.
+  static const double composedFrame = 2300 / _totalMs;
+
   static const _cyan = Color(0xFF38BDF8);
-  static const _blue = Color(0xFF1D4ED8);
   static const _ice = Color(0xFFBAE6FD);
+
+  // Regions of assets/images/logo_dark_hd.png (1308 × 452), in source pixels.
+  static const double _srcLeft = 18, _srcRight = 1248;
+  static const double _srcTop = 18; // top of "METER"
+  static const Rect _meterSrc = Rect.fromLTRB(300, 18, 590, 90);
+  static const double _lettersTop = 90, _lettersBottom = 372;
+  static const Rect _roadSrc = Rect.fromLTRB(18, 372, 1248, 432);
+  // Column boundaries between the letters of "Biyahe" (in the gaps).
+  static const List<double> _letterCuts = [148, 353, 422, 609, 788, 980, 1165];
 
   // Reused paints (no per-frame allocation churn).
   final Paint _imagePaint = Paint()
     ..filterQuality = FilterQuality.medium
     ..isAntiAlias = true;
-  final Paint _glintPaint = Paint()
-    ..filterQuality = FilterQuality.medium
-    ..isAntiAlias = true
-    ..colorFilter = ColorFilter.mode(
-      _ice.withValues(alpha: 0.34),
-      BlendMode.srcATop,
-    );
-  final Paint _fill = Paint();
+  final Paint _fill = Paint()..isAntiAlias = true;
   final Paint _line = Paint()
+    ..isAntiAlias = true
     ..style = PaintingStyle.stroke
-    ..strokeCap = StrokeCap.round;
+    ..strokeCap = StrokeCap.round
+    ..strokeJoin = StrokeJoin.round;
 
-  // Cached horizontal shader for the wavefront band (x-only gradient).
-  late final ui.Shader _waveShader = LinearGradient(
+  // Unit-radius shaders, drawn under a canvas scale, so they're built once.
+  static final ui.Shader _discShader = const RadialGradient(
+    center: Alignment(-0.25, -0.35),
+    colors: [Color(0xFF1A3466), Color(0xFF0B1733)],
+  ).createShader(Rect.fromCircle(center: Offset.zero, radius: 1));
+  static final ui.Shader _glowShader = RadialGradient(
     colors: [
-      Colors.transparent,
-      _cyan.withValues(alpha: 0.65),
-      Colors.white.withValues(alpha: 0.90),
-      _cyan.withValues(alpha: 0.65),
-      Colors.transparent,
+      _cyan.withValues(alpha: 0.30),
+      _cyan.withValues(alpha: 0.10),
+      _cyan.withValues(alpha: 0.0),
     ],
-    stops: const [0.0, 0.25, 0.50, 0.75, 1.0],
-  ).createShader(Rect.fromLTWH(0, 0, logoWidth, 1));
+    stops: const [0.0, 0.45, 1.0],
+  ).createShader(Rect.fromCircle(center: Offset.zero, radius: 1));
 
-  late final ui.Shader _waveGlowShader = LinearGradient(
-    colors: [
-      Colors.transparent,
-      _cyan.withValues(alpha: 0.16),
-      _cyan.withValues(alpha: 0.28),
-      _cyan.withValues(alpha: 0.16),
-      Colors.transparent,
-    ],
-    stops: const [0.0, 0.25, 0.50, 0.75, 1.0],
-  ).createShader(Rect.fromLTWH(0, 0, logoWidth, 1));
+  // ₱ in badge units (radius 1), centred on the badge.
+  static final Path _pesoBody = Path()
+    ..moveTo(-0.17, 0.36)
+    ..lineTo(-0.17, -0.32)
+    ..lineTo(0.04, -0.32)
+    ..arcToPoint(
+      const Offset(0.04, 0.06),
+      radius: const Radius.circular(0.19),
+    )
+    ..lineTo(-0.17, 0.06);
+  static final Path _pesoBars = Path()
+    ..moveTo(-0.33, -0.19)
+    ..lineTo(0.30, -0.19)
+    ..moveTo(-0.33, -0.07)
+    ..lineTo(0.30, -0.07);
+
+  // Tagline layouts cached per alpha step (TextPainter can't change alpha).
+  final Map<int, TextPainter> _taglineCache = {};
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final t = anim.value;
+  void paint(Canvas canvas, Size size) => paintAt(canvas, size, anim.value);
 
-    // Phases deliberately OVERLAP and every curve is soft at both ends, so the
-    // motion never stops-and-restarts between phases.
-    final exit = 1.0 - _seg(t, 0.89, 1.0, Curves.easeInOutSine);
-    final beam = -0.15 + 1.30 * _seg(t, 0.0, 0.27, Curves.easeInOutSine);
-    final reveal = _seg(t, 0.13, 0.52, _softOut);
-    final meterFlash = _pulse(t, 0.42, 0.58,
-        peak: 0.4, up: Curves.easeInOutSine, down: Curves.easeInOutSine);
-    final specular = -1.2 + 3.4 * _seg(t, 0.46, 0.80, Curves.easeInOutSine);
-    final breathe = _breathe(t);
-    // The logo never sits still: it settles in with a slow continuous push-in
-    // (easeOutSine keeps a gentle velocity), then the hyperspace pull ramps up
-    // smoothly from that same drift.
-    final drift = 0.94 + 0.11 * _seg(t, 0.0, 1.0, Curves.easeOutSine);
-    final zoom = drift * (1.0 + 2.3 * _seg(t, 0.76, 1.0, Curves.easeInCubic));
-    final rays = _pulse(t, 0.76, 0.98,
-        peak: 0.55, up: Curves.easeOutSine, down: Curves.easeInSine);
-    final rayTravel = _seg(t, 0.74, 1.0, Curves.easeInCubic);
+  void paintAt(Canvas canvas, Size size, double t) {
+    final ms = t * _totalMs;
+    final g = _Layout(size);
 
-    final center = Offset(size.width / 2, size.height / 2);
+    // ---- Exit choreography shared by everything.
+    final textExit = _seg(ms, 2450, 2700, Curves.easeInCubic);
+    final pullBack = _seg(ms, 2450, 2720, Curves.easeInOutCubic);
+    final zoomP = _seg(ms, 2720, _totalMs, _launch);
+    final zoomScale = g.coverScale / 0.9;
 
-    if (rays > 0.01) _paintRays(canvas, size, center, rays, rayTravel);
+    // ---- Badge scale: seed dot → full badge → pull back → zoom through.
+    final seed = _seg(ms, 0, 240, Curves.easeOutBack);
+    final bloom = _seg(ms, 300, 900, _bloom);
+    var k = 0.24 * seed + 0.76 * bloom;
+    k *= 1.0 - 0.10 * pullBack;
+    k *= 1.0 + (zoomScale - 1.0) * zoomP;
 
-    _paintBloom(canvas, center, reveal * 0.42 * breathe * exit, zoom);
+    final discAlpha = _seg(ms, 300, 620, Curves.easeOut);
+    final arcP = _seg(ms, 420, 1080, Curves.easeInOutCubic);
+    final pesoP = _seg(ms, 640, 960, Curves.easeOutCubic);
+    final glow = discAlpha * (1.0 - _seg(ms, 2720, 3000, Curves.easeIn));
 
-    // ---- Logo space: origin at the logo's top-left, scaled about its centre.
-    canvas.save();
-    canvas.translate(center.dx, center.dy);
-    canvas.scale(zoom);
-    canvas.translate(-logoWidth / 2, -logoHeight / 2);
+    _paintPings(canvas, g, ms);
+    if (glow > 0.01) _paintGlow(canvas, g, k, glow);
+    _paintBadge(canvas, g, k, ms, seed, discAlpha, arcP, pesoP, zoomP);
 
-    _paintLogo(canvas, reveal, exit);
-    if (specular > -0.25 && specular < 1.25) _paintGlint(canvas, specular);
-    _paintRoadBeam(canvas, beam, reveal, exit);
-    if (reveal > 0.02 && reveal < 0.98) _paintWavefront(canvas, reveal);
-    if (meterFlash > 0.01) _paintMeterFlash(canvas, meterFlash);
-
-    canvas.restore();
-
-    // ---- Optical flash bloom at the moment of departure.
-    if (t >= 0.86) {
-      final flash = (math.sin((t - 0.86) / 0.14 * math.pi) * 0.40).clamp(0.0, 1.0);
-      if (flash > 0.005) {
-        _fill
-          ..shader = null
-          ..color = _ice.withValues(alpha: flash);
-        canvas.drawRect(Offset.zero & size, _fill);
-      }
+    // ---- Wordmark + road + tagline (fall away together on exit).
+    final textAlpha = 1.0 - textExit;
+    if (textAlpha > 0.01 && image != null) {
+      final drop = 10.0 * textExit;
+      _paintLetters(canvas, g, ms, textAlpha, drop);
+      _paintMeterLabel(canvas, g, ms, textAlpha, drop);
+      _paintRoad(canvas, g, ms, textAlpha, drop);
     }
+    if (textAlpha > 0.01) _paintTagline(canvas, g, ms, textAlpha);
   }
 
-  /// One continuous swell (no kinks): rises with the reveal, falls into the zoom.
-  double _breathe(double t) {
-    final u = _seg(t, 0.30, 0.92);
-    return 0.76 + 0.24 * math.sin(u * math.pi);
-  }
-
-  // ----- Hyperspace rays: streaks that TRAVEL outward (head leads, tail follows)
-  // 4 batched draw calls, no shaders.
-  void _paintRays(Canvas canvas, Size size, Offset c, double intensity, double travel) {
-    final maxRadius = math.sqrt(size.width * size.width + size.height * size.height) / 2;
-
-    const rayCount = 24;
-    final thickTail = <Offset>[];
-    final thinTail = <Offset>[];
-    final thickHead = <Offset>[];
-    final thinHead = <Offset>[];
-
-    for (int i = 0; i < rayCount; i++) {
-      final angle = (i / rayCount) * (2 * math.pi) + (i * 0.15);
-      final innerDist = 60.0 + (i % 3 * 25.0);
-      final span = maxRadius - innerDist;
-
-      // Each ray moves at its own pace so the burst feels organic, not uniform.
-      final pace = 0.78 + 0.22 * (((i * 7) % 10) / 9.0);
-      final headP = (travel * pace * 1.15).clamp(0.0, 1.0);
-      final tailP = ((travel * pace * 1.15 - 0.38) / 0.62).clamp(0.0, 1.0);
-
-      final headDist = innerDist + span * headP;
-      final tailDist = innerDist + span * tailP * tailP;
-      final midDist = tailDist + (headDist - tailDist) * 0.6;
-
-      final cosA = math.cos(angle);
-      final sinA = math.sin(angle);
-      final p1 = Offset(c.dx + tailDist * cosA, c.dy + tailDist * sinA);
-      final pm = Offset(c.dx + midDist * cosA, c.dy + midDist * sinA);
-      final p2 = Offset(c.dx + headDist * cosA, c.dy + headDist * sinA);
-
-      final thick = i % 4 == 0;
-      (thick ? thickTail : thinTail).addAll([p1, p2]);
-      (thick ? thickHead : thinHead).addAll([pm, p2]);
-    }
-
-    _line.shader = null;
-    void batch(List<Offset> pts, double width, Color color) {
+  // GPS-lock pings: three at the fix, one more as the badge departs.
+  void _paintPings(Canvas canvas, _Layout g, double ms) {
+    for (final start in const [120.0, 360.0, 600.0, 2560.0]) {
+      final p = _seg(ms, start, start + 950, Curves.easeOutCubic);
+      if (p <= 0 || p >= 1) continue;
+      final a = 0.55 * math.pow(1 - p, 1.4);
       _line
-        ..strokeWidth = width
-        ..color = color;
-      canvas.drawPoints(ui.PointMode.lines, pts, _line);
+        ..shader = null
+        ..strokeWidth = 1.6
+        ..color = _cyan.withValues(alpha: a.toDouble());
+      canvas.drawCircle(g.badge, g.r * (0.35 + 2.1 * p), _line);
     }
-
-    final tail = _cyan.withValues(alpha: intensity * 0.30);
-    final head = Colors.white.withValues(alpha: intensity * 0.60);
-    batch(thickTail, 2.5, tail);
-    batch(thinTail, 1.2, tail);
-    batch(thickHead, 2.5, head);
-    batch(thinHead, 1.2, head);
   }
 
-  // ----- Ambient bloom: one radial-gradient circle --------------------------
-  void _paintBloom(Canvas canvas, Offset c, double opacity, double zoom) {
-    final a = opacity.clamp(0.0, 1.0);
-    if (a <= 0.005) return;
-
-    // Continuous growth (the old step at zoom 1.2 made the glow visibly pop).
-    final s = 1.0 + (math.max(zoom, 1.0) - 1.0) * 0.55;
-    final w1 = logoWidth * 1.6 * s;
-    final h1 = logoHeight * 2.8 * s;
-    final r = 0.65 * math.min(w1, h1);
-
+  void _paintGlow(Canvas canvas, _Layout g, double k, double a) {
+    canvas.save();
+    canvas.translate(g.badge.dx, g.badge.dy);
+    canvas.scale(g.r * math.max(k, 0.24) * 2.3);
     _fill
-      ..color = Colors.white
-      ..shader = RadialGradient(
-        radius: 0.5,
-        colors: [
-          _cyan.withValues(alpha: a),
-          _blue.withValues(alpha: a * 0.45),
-          Colors.transparent,
-        ],
-      ).createShader(Rect.fromCircle(center: c, radius: r));
-    canvas.drawCircle(c, r, _fill);
+      ..shader = _glowShader
+      ..color = Colors.white.withValues(alpha: a);
+    canvas.drawCircle(Offset.zero, 1, _fill);
+    canvas.restore();
     _fill.shader = null;
   }
 
-  // ----- Logo: bottom-up soft reveal via sliced drawImageRect ---------------
-  void _drawSlice(Canvas canvas, ui.Image img, double n0, double n1, double alpha) {
-    if (n1 <= n0 || alpha <= 0.003) return;
-    final iw = img.width.toDouble();
-    final ih = img.height.toDouble();
-    _imagePaint.color = Color.fromRGBO(255, 255, 255, alpha.clamp(0.0, 1.0));
-    canvas.drawImageRect(
-      img,
-      Rect.fromLTRB(0, n0 * ih, iw, n1 * ih),
-      Rect.fromLTRB(0, n0 * logoHeight, logoWidth, n1 * logoHeight),
-      _imagePaint,
-    );
-  }
+  void _paintBadge(
+    Canvas canvas,
+    _Layout g,
+    double k,
+    double ms,
+    double seed,
+    double discAlpha,
+    double arcP,
+    double pesoP,
+    double zoomP,
+  ) {
+    if (k <= 0) return;
+    canvas.save();
+    canvas.translate(g.badge.dx, g.badge.dy);
+    canvas.scale(g.r * k);
 
-  void _paintLogo(Canvas canvas, double reveal, double exit) {
-    final img = image;
-    if (img == null || reveal <= 0.0) return;
-
-    if (reveal >= 0.999) {
-      _drawSlice(canvas, img, 0.0, 1.0, exit);
-      return;
+    // Seed: the cyan GPS fix that the badge grows out of.
+    final coreAlpha = seed * (1.0 - _seg(ms, 380, 760, Curves.easeIn));
+    if (coreAlpha > 0.01) {
+      _fill
+        ..shader = null
+        ..color = _cyan.withValues(alpha: coreAlpha);
+      canvas.drawCircle(Offset.zero, 0.85, _fill);
+      _fill.color = _ice.withValues(alpha: coreAlpha);
+      canvas.drawCircle(Offset.zero, 0.5, _fill);
     }
 
-    const feather = 0.16;
-    final yLine = (1.0 + feather) * (1.0 - reveal);
+    if (discAlpha > 0.01) {
+      // Navy disc: at full zoom it fills the screen as the hand-off colour.
+      _fill
+        ..shader = _discShader
+        ..color = Colors.white.withValues(alpha: discAlpha);
+      canvas.drawCircle(Offset.zero, 1, _fill);
+      _fill.shader = null;
 
-    // Fully-revealed body below the wavefront.
-    _drawSlice(canvas, img, yLine.clamp(0.0, 1.0), 1.0, exit);
+      // Rim
+      _line
+        ..shader = null
+        ..strokeWidth = 0.035
+        ..color = _cyan.withValues(alpha: 0.45 * discAlpha);
+      canvas.drawCircle(Offset.zero, 0.985, _line);
 
-    // Soft feathered leading edge above it (eased so it fades in, not stair-steps).
-    const strips = 16;
-    for (int i = 0; i < strips; i++) {
-      final s0 = (yLine - feather + feather * i / strips).clamp(0.0, 1.0);
-      final s1 = (yLine - feather + feather * (i + 1) / strips).clamp(0.0, 1.0);
-      if (s1 <= s0) continue;
-      final mid = (s0 + s1) / 2;
-      final a = Curves.easeInOutSine
-          .transform((1.0 - (yLine - mid) / feather).clamp(0.0, 1.0));
-      _drawSlice(canvas, img, s0, s1, a * exit);
-    }
-  }
+      // Meter arc: 270° gauge, gap at the bottom, ticking up clockwise.
+      final detail = discAlpha * (1.0 - _seg(zoomP, 0.0, 0.55));
+      if (detail > 0.01) {
+        const start = math.pi * 0.75;
+        const sweep = math.pi * 1.5;
+        final arcRect = Rect.fromCircle(center: Offset.zero, radius: 0.72);
+        _line
+          ..strokeWidth = 0.11
+          ..color = Colors.white.withValues(alpha: 0.10 * detail);
+        canvas.drawArc(arcRect, start, sweep, false, _line);
+        if (arcP > 0) {
+          _line.color = _cyan.withValues(alpha: detail);
+          canvas.drawArc(arcRect, start, sweep * arcP, false, _line);
+          if (arcP < 1) {
+            final a = start + sweep * arcP;
+            final tip = Offset(math.cos(a) * 0.72, math.sin(a) * 0.72);
+            _fill.color = Colors.white.withValues(alpha: detail);
+            canvas.drawCircle(tip, 0.075, _fill);
+          }
+        }
 
-  // ----- Specular glint: clipped, tinted re-draw (3 nested bands) -----------
-  void _paintGlint(Canvas canvas, double specular) {
-    final img = image;
-    if (img == null) return;
-
-    final begin = Offset(logoWidth * 0.1, 0);
-    final d = Offset(logoWidth * 0.8, logoHeight);
-    final len = d.distance;
-    final perp = Offset(-d.dy, d.dx) / len * (logoWidth + logoHeight);
-
-    final src = Rect.fromLTWH(0, 0, img.width.toDouble(), img.height.toDouble());
-    final dst = Rect.fromLTWH(0, 0, logoWidth, logoHeight);
-
-    for (final half in const [0.22, 0.14, 0.07]) {
-      final p0 = begin + d * (specular - half);
-      final p1 = begin + d * (specular + half);
-      final path = Path()
-        ..moveTo(p0.dx + perp.dx, p0.dy + perp.dy)
-        ..lineTo(p0.dx - perp.dx, p0.dy - perp.dy)
-        ..lineTo(p1.dx - perp.dx, p1.dy - perp.dy)
-        ..lineTo(p1.dx + perp.dx, p1.dy + perp.dy)
-        ..close();
-      canvas.save();
-      canvas.clipPath(path);
-      canvas.drawImageRect(img, src, dst, _glintPaint);
-      canvas.restore();
-    }
-  }
-
-  // ----- Neon laser along the road baseline ---------------------------------
-  void _paintRoadBeam(Canvas canvas, double beamPos, double reveal, double exit) {
-    // Road lives in the bottom 18px strip of the logo.
-    final y = (logoHeight - 18) + 18 * 0.55;
-
-    // The laser exits the logo and fades out; it must NOT linger at the edge.
-    final f = 1.0 - _seg(beamPos, 0.92, 1.15, Curves.easeInSine);
-
-    if (beamPos > 0.0 && f > 0.01) {
-      final trailEnd = (beamPos * logoWidth).clamp(0.0, logoWidth);
-      final trailStart = ((beamPos - 0.45) * logoWidth).clamp(0.0, logoWidth);
-
-      if (trailEnd > trailStart) {
-        final rect = Rect.fromLTRB(trailStart, y - 1, trailEnd, y + 1);
-
-        // Neon aura: two stacked translucent bands instead of a blur filter.
-        _fill.shader = LinearGradient(colors: [
-          Colors.transparent,
-          _blue.withValues(alpha: 0.20 * f),
-          _cyan.withValues(alpha: 0.30 * f),
-        ]).createShader(rect);
-        canvas.drawRRect(
-          RRect.fromLTRBR(trailStart, y - 6, trailEnd, y + 6, const Radius.circular(6)),
-          _fill,
-        );
-        canvas.drawRRect(
-          RRect.fromLTRBR(trailStart, y - 3.5, trailEnd, y + 3.5, const Radius.circular(3.5)),
-          _fill,
-        );
-
-        // Sharp laser core.
-        _fill.shader = LinearGradient(colors: [
-          Colors.transparent,
-          _cyan.withValues(alpha: f),
-          Colors.white.withValues(alpha: f),
-        ]).createShader(rect);
-        canvas.drawRRect(
-          RRect.fromLTRBR(trailStart, y - 1.2, trailEnd, y + 1.2, const Radius.circular(1.2)),
-          _fill,
-        );
-
-        // Leading spark.
-        final head = Offset(trailEnd, y);
-        _fill.shader = RadialGradient(
-          radius: 0.5,
-          colors: [
-            _cyan.withValues(alpha: 0.95 * f),
-            _cyan.withValues(alpha: 0.0),
-          ],
-        ).createShader(Rect.fromCircle(center: head, radius: 14));
-        canvas.drawCircle(head, 14, _fill);
-        _fill
-          ..shader = null
-          ..color = Colors.white.withValues(alpha: f);
-        canvas.drawCircle(head, 3.2, _fill);
+        // ₱ — the fare at the heart of the meter.
+        if (pesoP > 0) {
+          canvas.save();
+          canvas.scale(0.72 + 0.28 * pesoP);
+          _line
+            ..strokeWidth = 0.115
+            ..color = Colors.white.withValues(alpha: pesoP * detail);
+          canvas.drawPath(_pesoBody, _line);
+          _line.strokeWidth = 0.085;
+          canvas.drawPath(_pesoBars, _line);
+          canvas.restore();
+        }
       }
     }
+    canvas.restore();
+  }
 
-    // Cascading ignition of the speed dashes along the right half.
-    final dashStartX = logoWidth * 0.52;
-    final dashEndX = logoWidth * 0.98;
-    const dashCount = 18;
-    _line
-      ..shader = null
-      ..strokeWidth = 2.0;
+  void _paintLetters(
+      Canvas canvas, _Layout g, double ms, double alpha, double drop) {
+    final img = image!;
+    for (var i = 0; i < _letterCuts.length - 1; i++) {
+      final start = 960.0 + i * 70;
+      final p = _seg(ms, start, start + 360, Curves.easeOutCubic);
+      if (p <= 0) continue;
+      final src = Rect.fromLTRB(
+          _letterCuts[i], _lettersTop, _letterCuts[i + 1], _lettersBottom);
+      final dst = g.logoRect(src).shift(Offset(0, 12 * (1 - p) + drop));
+      _imagePaint.color = Colors.white.withValues(alpha: p * alpha);
+      canvas.drawImageRect(img, src, dst, _imagePaint);
+    }
+  }
 
-    for (int i = 0; i < dashCount; i++) {
-      final k = i / (dashCount - 1);
-      final dx = dashStartX + k * (dashEndX - dashStartX);
-      final trigger = 0.52 + k * 0.46;
+  void _paintMeterLabel(
+      Canvas canvas, _Layout g, double ms, double alpha, double drop) {
+    final p = _seg(ms, 1460, 1760, Curves.easeOutCubic);
+    if (p <= 0) return;
+    final dst = g.logoRect(_meterSrc).shift(Offset(-10 * (1 - p), drop));
+    _imagePaint.color = Colors.white.withValues(alpha: p * alpha);
+    canvas.drawImageRect(image!, _meterSrc, dst, _imagePaint);
+  }
 
-      double alpha = 0.0;
-      if (beamPos >= trigger) {
-        // Bright flash as the laser passes, easing down into a soft settled glow
-        // (max() keeps brightness continuous - no dip-then-jump).
-        final d = ((beamPos - trigger) / 0.16).clamp(0.0, 1.0);
-        final flash = (1.0 - d) * (1.0 - d);
-        final settled = 0.30 * reveal * Curves.easeOutSine.transform(d);
-        alpha = math.max(flash, settled) * exit;
-      }
+  void _paintRoad(
+      Canvas canvas, _Layout g, double ms, double alpha, double drop) {
+    final q = _seg(ms, 1300, 1950, Curves.easeInOutCubic);
+    if (q <= 0) return;
+    final src = Rect.fromLTRB(_roadSrc.left, _roadSrc.top,
+        _roadSrc.left + _roadSrc.width * q, _roadSrc.bottom);
+    final dst = g.logoRect(src).shift(Offset(0, drop));
+    _imagePaint.color = Colors.white.withValues(alpha: alpha);
+    canvas.drawImageRect(image!, src, dst, _imagePaint);
 
-      if (alpha > 0.02) {
-        _line.color = _cyan.withValues(alpha: alpha);
-        canvas.drawLine(Offset(dx, y - 2.5), Offset(dx, y + 2.5), _line);
+    // Headlight at the leading edge while the road is still driving in.
+    final head = (1.0 - _seg(q, 0.85, 1.0)) * alpha;
+    if (head > 0.01) {
+      final c = Offset(dst.right, dst.center.dy - 2);
+      _fill.shader = null;
+      for (final (rad, a) in const [(14.0, 0.10), (7.0, 0.28), (3.2, 0.95)]) {
+        _fill.color =
+            (a > 0.5 ? Colors.white : _cyan).withValues(alpha: a * head);
+        canvas.drawCircle(c, rad, _fill);
       }
     }
   }
 
-  // ----- Vertical wavefront band ---------------------------------------------
-  void _paintWavefront(Canvas canvas, double reveal) {
-    // Swell in at the start and out at the end instead of popping.
-    final e = math.min(reveal / 0.12, (1.0 - reveal) / 0.12).clamp(0.0, 1.0);
-    if (e <= 0.01) return;
-
-    final mid = (1.0 - reveal) * logoHeight;
-    _fill.color = Colors.white;
-
-    // Wide faint halo, then the bright core.
-    _fill.shader = _waveGlowShader;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(logoWidth / 2, mid), width: logoWidth, height: 30 * e),
-        const Radius.circular(15),
-      ),
-      _fill,
+  void _paintTagline(Canvas canvas, _Layout g, double ms, double alpha) {
+    final inP = _seg(ms, 1800, 2160, Curves.easeOutCubic);
+    final p = inP * alpha;
+    if (p <= 0.01) return;
+    final step = (p * 20).round(); // 21 cached layouts at most
+    final tp = _taglineCache.putIfAbsent(step, () {
+      final base = taglineStyle.color ?? Colors.white;
+      return TextPainter(
+        text: TextSpan(
+          text: 'Know your fare. Plan your byahe.',
+          style: taglineStyle.copyWith(
+            color: base.withValues(alpha: base.a * step / 20),
+          ),
+        ),
+        textAlign: TextAlign.center,
+        textDirection: TextDirection.ltr,
+        maxLines: 2,
+      )..layout(maxWidth: g.size.width - 48);
+    });
+    tp.paint(
+      canvas,
+      Offset((g.size.width - tp.width) / 2, g.taglineTop + 6 * (1 - inP)),
     );
-    _fill.shader = _waveShader;
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(center: Offset(logoWidth / 2, mid), width: logoWidth, height: 10 * e),
-        const Radius.circular(5),
-      ),
-      _fill,
-    );
-    _fill.shader = null;
-  }
-
-  // ----- "METER" electric pop -------------------------------------------------
-  void _paintMeterFlash(Canvas canvas, double flash) {
-    final c = Offset(logoWidth * 0.40, logoHeight * 0.20);
-    final rect = Rect.fromCenter(center: c, width: logoWidth * 0.46, height: logoHeight * 0.62);
-    _fill
-      ..color = Colors.white
-      ..shader = RadialGradient(
-        radius: 0.5,
-        colors: [
-          _cyan.withValues(alpha: flash * 0.75),
-          _cyan.withValues(alpha: 0.0),
-        ],
-      ).createShader(rect);
-    canvas.drawOval(rect, _fill);
-    _fill.shader = null;
   }
 
   @override
-  bool shouldRepaint(covariant _SplashPainter old) {
-    return old.image != image ||
-        old.logoWidth != logoWidth ||
-        old.logoHeight != logoHeight ||
-        old.anim != anim;
-  }
+  bool shouldRepaint(covariant _SplashPainter old) =>
+      old.image != image || old.taglineStyle != taglineStyle;
 }
 
-/// Backward compatibility alias
-typedef PremiumSplashView = SplashScreen;
+/// Responsive geometry: badge above the wordmark, the group centred on screen.
+class _Layout {
+  final Size size;
+  late final double r; // badge radius
+  late final Offset badge;
+  late final double logoScale; // logical px per source px
+  late final Offset logoOrigin; // where source (_srcLeft, _srcTop) lands
+  late final double taglineTop;
+  late final double coverScale; // badge scale that covers the whole screen
+
+  _Layout(this.size) {
+    final w = size.width, h = size.height;
+    final isTablet = w >= 600;
+    final d = (w * (isTablet ? 0.15 : 0.27)).clamp(84.0, 124.0);
+    r = d / 2;
+    final logoW = (w * (isTablet ? 0.40 : 0.64)).clamp(230.0, 360.0);
+    logoScale = logoW / (_SplashPainter._srcRight - _SplashPainter._srcLeft);
+    final logoH =
+        (_SplashPainter._roadSrc.bottom - _SplashPainter._srcTop) * logoScale;
+
+    final gapBadge = d * 0.34;
+    const gapTag = 18.0, tagH = 20.0;
+    final group = d + gapBadge + logoH + gapTag + tagH;
+    final top = (h - group) / 2 - h * 0.02;
+
+    badge = Offset(w / 2, top + r);
+    logoOrigin = Offset((w - logoW) / 2, top + d + gapBadge);
+    taglineTop = logoOrigin.dy + logoH + gapTag;
+
+    final far = math.sqrt(math.pow(math.max(badge.dx, w - badge.dx), 2) +
+        math.pow(math.max(badge.dy, h - badge.dy), 2));
+    coverScale = far / r * 1.08;
+  }
+
+  Rect logoRect(Rect src) => Rect.fromLTRB(
+        logoOrigin.dx + (src.left - _SplashPainter._srcLeft) * logoScale,
+        logoOrigin.dy + (src.top - _SplashPainter._srcTop) * logoScale,
+        logoOrigin.dx + (src.right - _SplashPainter._srcLeft) * logoScale,
+        logoOrigin.dy + (src.bottom - _SplashPainter._srcTop) * logoScale,
+      );
+}
