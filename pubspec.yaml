@@ -63,6 +63,8 @@ dev_dependencies:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  # Test fakes for GPS-free trip tests (already resolved transitively).
+  wakelock_plus_platform_interface: ^1.5.1
   flutter_launcher_icons: ^0.14.1
 
 # For information on the generic Dart part of this file, see the

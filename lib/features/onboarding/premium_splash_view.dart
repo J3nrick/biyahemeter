@@ -29,10 +29,14 @@ class SplashScreen extends StatefulWidget {
   final VoidCallback? onFinish;
   final AnimationController? controller; // Optional backward compatibility
 
+  /// Repeat launches: same sequence played faster so the app opens sooner.
+  final bool quick;
+
   const SplashScreen({
     super.key,
     this.onFinish,
     this.controller,
+    this.quick = false,
   });
 
   @override
@@ -45,6 +49,7 @@ class _SplashScreenState extends State<SplashScreen>
   static const _total = Duration(milliseconds: 3200);
 
   late final AnimationController _anim;
+  double get _speed => widget.quick ? 0.55 : 1.0;
 
   ImageStream? _stream;
   ImageStreamListener? _listener;
@@ -61,7 +66,7 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
 
-    _anim = AnimationController(vsync: this, duration: _total);
+    _anim = AnimationController(vsync: this, duration: _total * _speed);
 
     _anim.addStatusListener((status) {
       if (status == AnimationStatus.completed) {
@@ -163,7 +168,7 @@ class _SplashScreenState extends State<SplashScreen>
     // Tactile cues: GPS fix, METER clicks in, zoom-through.
     if (!kIsWeb) {
       void at(int ms, Future<void> Function() fire) {
-        _haptics.add(Timer(Duration(milliseconds: ms), () {
+        _haptics.add(Timer(Duration(milliseconds: (ms * _speed).round()), () {
           if (!mounted) return;
           try {
             fire();
@@ -177,7 +182,7 @@ class _SplashScreenState extends State<SplashScreen>
     }
 
     // Safety fallback
-    _safetyTimer = Timer(_total + const Duration(milliseconds: 300), () {
+    _safetyTimer = Timer(_anim.duration! + const Duration(milliseconds: 300), () {
       if (mounted) _proceed();
     });
   }
