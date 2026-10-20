@@ -17,3 +17,17 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+
+  # The dev machine is Windows, so this is where iOS actually gets compiled.
+  # macOS runners are free for public repos.
+  build-ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.38.7
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - run: flutter build ios --release --no-codesign
