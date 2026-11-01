@@ -8,23 +8,20 @@ import 'package:biyahe_meter/features/onboarding/agreements_screen.dart';
 
 /// Screen 1: Splash Screen (`SplashScreen`)
 ///
-/// "Meter Lock" — a fare-meter badge finds its GPS fix, the brand types itself
-/// in, the road drives across, then the badge zooms through into the app:
-/// - 0.00–0.90s  GPS seed dot pops, ping rings ripple out, the badge blooms
-///               and its cyan meter arc ticks up around a ₱ sign.
-/// - 0.95–1.95s  "Biyahe" reveals letter by letter, "METER" clicks in, the
-///               road streak drives in left→right with a light at its head.
-/// - 1.80–2.15s  Tagline settles in. Brief hold.
-/// - 2.45–3.20s  Text falls away, the badge pulls back, then zooms through
-///               the screen (its navy disc fills it) into the Agreements screen.
+/// "Light Assembly" — made from nothing but the logo's own pixels:
+/// - 0.00–1.10s  Inflow: the logo is sampled into ~6k points of light that
+///               stream in from the left like headlights, leaving light trails,
+///               and land on their exact pixel (left→right, like the road bar).
+/// - 0.90–1.45s  Ignition: the crisp HD logo takes over with a brief flare.
+/// - 1.35–1.95s  Sheen: a specular band sweeps the letters.
+/// - 2.00–2.80s  Departure: the logo breaks back into light and launches off
+///               to the right, leaving a clear screen for the app.
 ///
-/// PERFORMANCE ARCHITECTURE (see memory-bank/activeContext.md, do not regress):
-/// - ONE [CustomPainter] repainted by the controller (`repaint:`): zero widget
-///   rebuilds per frame. Static backdrop on its own [RepaintBoundary].
-/// - Logo decoded to `ui.Image` BEFORE the clock starts; shaders warmed offscreen.
-/// - No `saveLayer`: no ShaderMask/Opacity/BackdropFilter/blur MaskFilter.
-///   Letter reveal = sliced `drawImageRect` + paint alpha; glows = cached
-///   radial-gradient shaders drawn under a canvas transform.
+/// PERFORMANCE (see memory-bank/activeContext.md, do not regress):
+/// - ONE [CustomPainter] repainted by the controller; zero widget rebuilds.
+/// - Logo decoded + sampled into particles BEFORE the clock starts.
+/// - Particles = two batched `drawRawPoints` calls per frame (white, cyan).
+/// - No saveLayer / ShaderMask / Opacity / BackdropFilter / blur MaskFilter.
 class SplashScreen extends StatefulWidget {
   final VoidCallback? onFinish;
   final AnimationController? controller; // Optional backward compatibility
@@ -46,14 +43,14 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   static const _logoAsset = 'assets/images/logo_dark_hd.png';
-  static const _total = Duration(milliseconds: 3200);
+  static const _total = Duration(milliseconds: 2800);
 
   late final AnimationController _anim;
-  double get _speed => widget.quick ? 0.55 : 1.0;
 
   ImageStream? _stream;
   ImageStreamListener? _listener;
   ImageInfo? _logoInfo;
+  _Particles? _particles;
   bool _resolved = false;
   bool _started = false;
   bool _warming = false;
@@ -61,6 +58,8 @@ class _SplashScreenState extends State<SplashScreen>
   Timer? _startFallback;
   Timer? _safetyTimer;
   final List<Timer> _haptics = [];
+
+  double get _speed => widget.quick ? 0.55 : 1.0;
 
   @override
   void initState() {
@@ -74,7 +73,7 @@ class _SplashScreenState extends State<SplashScreen>
       }
     });
 
-    // Never block the app: covers slow decode + the (capped) shader warm-up.
+    // Never block the app: covers slow decode + sampling + shader warm-up.
     _startFallback = Timer(const Duration(milliseconds: 2200), _begin);
   }
 
@@ -84,40 +83,30 @@ class _SplashScreenState extends State<SplashScreen>
     if (_resolved) return;
     _resolved = true;
 
-    // Decode the logo up-front. The clock only starts once the pixels are ready,
-    // so the first animated frame is already as cheap as the last one.
-    final stream = const AssetImage(_logoAsset)
-        .resolve(createLocalImageConfiguration(context));
+    final stream = const AssetImage(
+      _logoAsset,
+    ).resolve(createLocalImageConfiguration(context));
     _stream = stream;
-    _listener = ImageStreamListener(
-      (info, synchronousCall) {
-        _logoInfo?.dispose();
-        _logoInfo = info.clone();
-        if (!synchronousCall && mounted) setState(() {});
-        _warmUpThenBegin();
-      },
-      onError: (_, _) => _begin(),
-    );
+    _listener = ImageStreamListener((info, synchronousCall) {
+      _logoInfo?.dispose();
+      _logoInfo = info.clone();
+      _prepareThenBegin();
+    }, onError: (_, _) => _begin());
     stream.addListener(_listener!);
   }
 
-  TextStyle get _taglineStyle =>
-      (Theme.of(context).textTheme.bodyMedium ?? const TextStyle()).copyWith(
-        fontSize: 14,
-        fontWeight: FontWeight.w500,
-        letterSpacing: 0.2,
-        height: 1.2,
-        color: const Color(0xFFB8C4D9), // ≥7:1 on the navy backdrop
-      );
-
-  /// Render a handful of frames offscreen (tiny, 1/4 scale) BEFORE the clock
-  /// starts, so every gradient / clip / image pipeline is compiled before its
-  /// first real appearance. Capped so it can never delay the splash noticeably.
-  Future<void> _warmUpThenBegin() async {
+  /// Sample particles and warm shaders offscreen BEFORE the clock starts, so
+  /// the first animated frame costs the same as the last. Capped so it can
+  /// never delay the splash noticeably.
+  Future<void> _prepareThenBegin() async {
     if (_started || _warming) return;
     _warming = true;
     try {
-      await _warmUp().timeout(const Duration(milliseconds: 700));
+      await (() async {
+        _particles = await _Particles.sample(_logoInfo!.image);
+        if (mounted) setState(() {});
+        await _warmUp();
+      })().timeout(const Duration(milliseconds: 900));
     } catch (_) {}
     if (!mounted) return;
     WidgetsBinding.instance.addPostFrameCallback((_) => _begin());
@@ -125,7 +114,7 @@ class _SplashScreenState extends State<SplashScreen>
 
   Future<void> _warmUp() async {
     final img = _logoInfo?.image;
-    if (img == null) return;
+    if (img == null || !mounted) return;
     final size = MediaQuery.sizeOf(context);
     const scale = 0.25;
     final w = math.max(1, (size.width * scale).ceil());
@@ -133,15 +122,12 @@ class _SplashScreenState extends State<SplashScreen>
     final painter = _SplashPainter(
       anim: const AlwaysStoppedAnimation<double>(0),
       image: img,
-      taglineStyle: _taglineStyle,
+      particles: _particles,
     );
-
-    // One time-point inside each effect: seed + pings, bloom + arc, letters +
-    // road head, tagline, exit, zoom-through.
-    for (final t in const [0.05, 0.20, 0.36, 0.50, 0.62, 0.80, 0.95]) {
+    // One time-point inside each effect: inflow, ignition, sheen, departure.
+    for (final t in const [0.20, 0.42, 0.58, 0.80]) {
       final recorder = ui.PictureRecorder();
-      final canvas = Canvas(recorder);
-      canvas.scale(scale);
+      final canvas = Canvas(recorder)..scale(scale);
       painter.paintAt(canvas, size, t);
       final picture = recorder.endRecording();
       final out = await picture.toImage(w, h);
@@ -156,35 +142,39 @@ class _SplashScreenState extends State<SplashScreen>
     _startFallback?.cancel();
     _startFallback = null;
 
-    // Reduced motion: show the composed brand frame, no zoom, no haptics.
+    // Reduced motion: the crisp logo, still, then on to the app.
     if (MediaQuery.disableAnimationsOf(context)) {
       _anim.value = _SplashPainter.composedFrame;
-      _safetyTimer = Timer(const Duration(milliseconds: 1000), _proceed);
+      _safetyTimer = Timer(const Duration(milliseconds: 900), _proceed);
       return;
     }
 
     _anim.forward();
 
-    // Tactile cues: GPS fix, METER clicks in, zoom-through.
+    // Tactile cues: ignition, departure.
     if (!kIsWeb) {
       void at(int ms, Future<void> Function() fire) {
-        _haptics.add(Timer(Duration(milliseconds: (ms * _speed).round()), () {
-          if (!mounted) return;
-          try {
-            fire();
-          } catch (_) {}
-        }));
+        _haptics.add(
+          Timer(Duration(milliseconds: (ms * _speed).round()), () {
+            if (!mounted) return;
+            try {
+              fire();
+            } catch (_) {}
+          }),
+        );
       }
 
-      at(140, HapticFeedback.lightImpact);
-      at(1500, HapticFeedback.selectionClick);
-      at(2740, HapticFeedback.mediumImpact);
+      at(1150, HapticFeedback.lightImpact);
+      at(2050, HapticFeedback.mediumImpact);
     }
 
     // Safety fallback
-    _safetyTimer = Timer(_anim.duration! + const Duration(milliseconds: 300), () {
-      if (mounted) _proceed();
-    });
+    _safetyTimer = Timer(
+      _anim.duration! + const Duration(milliseconds: 300),
+      () {
+        if (mounted) _proceed();
+      },
+    );
   }
 
   void _proceed() {
@@ -240,7 +230,7 @@ class _SplashScreenState extends State<SplashScreen>
         backgroundColor: const Color(0xFF03050C),
         body: Semantics(
           container: true,
-          label: 'Biyahe Meter. Know your fare. Plan your byahe.',
+          label: 'Biyahe Meter',
           child: ExcludeSemantics(
             child: Stack(
               fit: StackFit.expand,
@@ -253,23 +243,21 @@ class _SplashScreenState extends State<SplashScreen>
                         center: Alignment(0.0, -0.05),
                         radius: 1.35,
                         colors: [
-                          Color(0xFF0C1B3E), // Midnight sapphire core
-                          Color(0xFF060D20), // Deep indigo transition
-                          Color(0xFF020409), // Pure obsidian perimeter
+                          Color(0xFF0C1B3E),
+                          Color(0xFF060D20),
+                          Color(0xFF020409),
                         ],
                         stops: [0.0, 0.58, 1.0],
                       ),
                     ),
                   ),
                 ),
-
-                // The entire animation: one painter, repainted by the controller only.
                 RepaintBoundary(
                   child: CustomPaint(
                     painter: _SplashPainter(
                       anim: _anim,
                       image: _logoInfo?.image,
-                      taglineStyle: _taglineStyle,
+                      particles: _particles,
                     ),
                     isComplex: true,
                     willChange: true,
@@ -285,21 +273,78 @@ class _SplashScreenState extends State<SplashScreen>
 }
 
 // ---------------------------------------------------------------------------
-// Timeline helpers (all times in ms of the 3200 ms clock)
+// Logo → particles
 // ---------------------------------------------------------------------------
 
-const double _totalMs = 3200;
+/// Points sampled from the logo's opaque pixels, in logo-crop units (0..1),
+/// with per-point random seeds. Built once from the decoded image.
+class _Particles {
+  final Float32List x, y, r1, r2, r3;
+  final List<bool> cyan;
+  final double dot; // sampling step as a fraction of the crop width
 
-/// Eased 0..1 progress of the current time across [aMs]..[bMs].
-double _seg(double ms, double aMs, double bMs, [Curve curve = Curves.linear]) {
-  return curve.transform(((ms - aMs) / (bMs - aMs)).clamp(0.0, 1.0));
+  _Particles(this.x, this.y, this.r1, this.r2, this.r3, this.cyan, this.dot);
+
+  int get length => cyan.length;
+
+  static const _maxPoints = 6500;
+
+  static Future<_Particles?> sample(ui.Image img) async {
+    final data = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
+    if (data == null) return null;
+    final w = img.width;
+    final crop = _SplashPainter.cropOf(w);
+
+    bool opaque(int px, int py) => data.getUint8((py * w + px) * 4 + 3) > 140;
+
+    // Coarsest step that still keeps the count under budget.
+    var step = 4;
+    while (true) {
+      var n = 0;
+      for (var py = crop.top.toInt(); py < crop.bottom; py += step) {
+        for (var px = crop.left.toInt(); px < crop.right; px += step) {
+          if (opaque(px, py)) n++;
+        }
+      }
+      if (n <= _maxPoints || step >= 12) break;
+      step++;
+    }
+
+    final xs = <double>[], ys = <double>[], cy = <bool>[];
+    for (var py = crop.top.toInt(); py < crop.bottom; py += step) {
+      for (var px = crop.left.toInt(); px < crop.right; px += step) {
+        if (!opaque(px, py)) continue;
+        final i = (py * w + px) * 4;
+        final r = data.getUint8(i), b = data.getUint8(i + 2);
+        xs.add((px - crop.left) / crop.width);
+        ys.add((py - crop.top) / crop.height);
+        cy.add(b > 180 && r < 160); // METER + road are cyan, letters white
+      }
+    }
+    final n = cy.length;
+    final rnd = math.Random(7);
+    Float32List seeds() =>
+        Float32List.fromList(List.generate(n, (_) => rnd.nextDouble()));
+    return _Particles(
+      Float32List.fromList(xs),
+      Float32List.fromList(ys),
+      seeds(),
+      seeds(),
+      seeds(),
+      cy,
+      step / crop.width,
+    );
+  }
 }
 
-/// Mild overshoot for the badge bloom (≈4%), never springy.
-const Curve _bloom = Cubic(0.34, 1.25, 0.64, 1.0);
+// ---------------------------------------------------------------------------
+// Timeline helpers (ms of the 2800 ms clock)
+// ---------------------------------------------------------------------------
 
-/// Slow start, then accelerates hard: the zoom-through.
-const Curve _launch = Cubic(0.72, 0.0, 0.86, 0.0);
+const double _totalMs = 2800;
+
+double _seg(double ms, double aMs, double bMs, [Curve curve = Curves.linear]) =>
+    curve.transform(((ms - aMs) / (bMs - aMs)).clamp(0.0, 1.0));
 
 // ---------------------------------------------------------------------------
 // Single-pass splash painter
@@ -308,334 +353,199 @@ const Curve _launch = Cubic(0.72, 0.0, 0.86, 0.0);
 class _SplashPainter extends CustomPainter {
   final Animation<double> anim;
   final ui.Image? image;
-  final TextStyle taglineStyle;
+  final _Particles? particles;
 
   _SplashPainter({
     required this.anim,
     required this.image,
-    required this.taglineStyle,
+    required this.particles,
   }) : super(repaint: anim);
 
-  /// Animation value where badge, wordmark and tagline are all fully in.
-  static const double composedFrame = 2300 / _totalMs;
+  /// Value where the crisp logo is fully in and still (reduced motion).
+  static const double composedFrame = 1990 / _totalMs;
 
   static const _cyan = Color(0xFF38BDF8);
-  static const _ice = Color(0xFFBAE6FD);
 
-  // Regions of assets/images/logo_dark_hd.png (1308 × 452), in source pixels.
-  static const double _srcLeft = 18, _srcRight = 1248;
-  static const double _srcTop = 18; // top of "METER"
-  static const Rect _meterSrc = Rect.fromLTRB(300, 18, 590, 90);
-  static const double _lettersTop = 90, _lettersBottom = 372;
-  static const Rect _roadSrc = Rect.fromLTRB(18, 372, 1248, 432);
-  // Column boundaries between the letters of "Biyahe" (in the gaps).
-  static const List<double> _letterCuts = [148, 353, 422, 609, 788, 980, 1165];
+  /// Visible logo inside logo_dark_hd.png (1308 × 452), scaled to [imgW].
+  static Rect cropOf(int imgW) {
+    final s = imgW / 1308;
+    return Rect.fromLTRB(18 * s, 18 * s, 1248 * s, 432 * s);
+  }
 
-  // Reused paints (no per-frame allocation churn).
   final Paint _imagePaint = Paint()
     ..filterQuality = FilterQuality.medium
     ..isAntiAlias = true;
-  final Paint _fill = Paint()..isAntiAlias = true;
-  final Paint _line = Paint()
-    ..isAntiAlias = true
-    ..style = PaintingStyle.stroke
+  final Paint _sheenPaint = Paint()
+    ..filterQuality = FilterQuality.medium
+    ..colorFilter = const ColorFilter.mode(
+      Color(0x8CFFFFFF),
+      BlendMode.srcATop,
+    );
+  final Paint _white = Paint()
     ..strokeCap = StrokeCap.round
-    ..strokeJoin = StrokeJoin.round;
+    ..blendMode = BlendMode.plus; // overlapping trails add up like real light
+  final Paint _blue = Paint()
+    ..strokeCap = StrokeCap.round
+    ..blendMode = BlendMode.plus;
 
-  // Unit-radius shaders, drawn under a canvas scale, so they're built once.
-  static final ui.Shader _discShader = const RadialGradient(
-    center: Alignment(-0.25, -0.35),
-    colors: [Color(0xFF1A3466), Color(0xFF0B1733)],
-  ).createShader(Rect.fromCircle(center: Offset.zero, radius: 1));
-  static final ui.Shader _glowShader = RadialGradient(
-    colors: [
-      _cyan.withValues(alpha: 0.30),
-      _cyan.withValues(alpha: 0.10),
-      _cyan.withValues(alpha: 0.0),
-    ],
-    stops: const [0.0, 0.45, 1.0],
-  ).createShader(Rect.fromCircle(center: Offset.zero, radius: 1));
-
-  // ₱ in badge units (radius 1), centred on the badge.
-  static final Path _pesoBody = Path()
-    ..moveTo(-0.17, 0.36)
-    ..lineTo(-0.17, -0.32)
-    ..lineTo(0.04, -0.32)
-    ..arcToPoint(
-      const Offset(0.04, 0.06),
-      radius: const Radius.circular(0.19),
-    )
-    ..lineTo(-0.17, 0.06);
-  static final Path _pesoBars = Path()
-    ..moveTo(-0.33, -0.19)
-    ..lineTo(0.30, -0.19)
-    ..moveTo(-0.33, -0.07)
-    ..lineTo(0.30, -0.07);
-
-  // Tagline layouts cached per alpha step (TextPainter can't change alpha).
-  final Map<int, TextPainter> _taglineCache = {};
+  Float32List? _whiteBuf, _blueBuf;
 
   @override
   void paint(Canvas canvas, Size size) => paintAt(canvas, size, anim.value);
 
   void paintAt(Canvas canvas, Size size, double t) {
     final ms = t * _totalMs;
-    final g = _Layout(size);
-
-    // ---- Exit choreography shared by everything.
-    final textExit = _seg(ms, 2450, 2700, Curves.easeInCubic);
-    final pullBack = _seg(ms, 2450, 2720, Curves.easeInOutCubic);
-    final zoomP = _seg(ms, 2720, _totalMs, _launch);
-    final zoomScale = g.coverScale / 0.9;
-
-    // ---- Badge scale: seed dot → full badge → pull back → zoom through.
-    final seed = _seg(ms, 0, 240, Curves.easeOutBack);
-    final bloom = _seg(ms, 300, 900, _bloom);
-    var k = 0.24 * seed + 0.76 * bloom;
-    k *= 1.0 - 0.10 * pullBack;
-    k *= 1.0 + (zoomScale - 1.0) * zoomP;
-
-    final discAlpha = _seg(ms, 300, 620, Curves.easeOut);
-    final arcP = _seg(ms, 420, 1080, Curves.easeInOutCubic);
-    final pesoP = _seg(ms, 640, 960, Curves.easeOutCubic);
-    final glow = discAlpha * (1.0 - _seg(ms, 2720, 3000, Curves.easeIn));
-
-    _paintPings(canvas, g, ms);
-    if (glow > 0.01) _paintGlow(canvas, g, k, glow);
-    _paintBadge(canvas, g, k, ms, seed, discAlpha, arcP, pesoP, zoomP);
-
-    // ---- Wordmark + road + tagline (fall away together on exit).
-    final textAlpha = 1.0 - textExit;
-    if (textAlpha > 0.01 && image != null) {
-      final drop = 10.0 * textExit;
-      _paintLetters(canvas, g, ms, textAlpha, drop);
-      _paintMeterLabel(canvas, g, ms, textAlpha, drop);
-      _paintRoad(canvas, g, ms, textAlpha, drop);
-    }
-    if (textAlpha > 0.01) _paintTagline(canvas, g, ms, textAlpha);
-  }
-
-  // GPS-lock pings: three at the fix, one more as the badge departs.
-  void _paintPings(Canvas canvas, _Layout g, double ms) {
-    for (final start in const [120.0, 360.0, 600.0, 2560.0]) {
-      final p = _seg(ms, start, start + 950, Curves.easeOutCubic);
-      if (p <= 0 || p >= 1) continue;
-      final a = 0.55 * math.pow(1 - p, 1.4);
-      _line
-        ..shader = null
-        ..strokeWidth = 1.6
-        ..color = _cyan.withValues(alpha: a.toDouble());
-      canvas.drawCircle(g.badge, g.r * (0.35 + 2.1 * p), _line);
-    }
-  }
-
-  void _paintGlow(Canvas canvas, _Layout g, double k, double a) {
-    canvas.save();
-    canvas.translate(g.badge.dx, g.badge.dy);
-    canvas.scale(g.r * math.max(k, 0.24) * 2.3);
-    _fill
-      ..shader = _glowShader
-      ..color = Colors.white.withValues(alpha: a);
-    canvas.drawCircle(Offset.zero, 1, _fill);
-    canvas.restore();
-    _fill.shader = null;
-  }
-
-  void _paintBadge(
-    Canvas canvas,
-    _Layout g,
-    double k,
-    double ms,
-    double seed,
-    double discAlpha,
-    double arcP,
-    double pesoP,
-    double zoomP,
-  ) {
-    if (k <= 0) return;
-    canvas.save();
-    canvas.translate(g.badge.dx, g.badge.dy);
-    canvas.scale(g.r * k);
-
-    // Seed: the cyan GPS fix that the badge grows out of.
-    final coreAlpha = seed * (1.0 - _seg(ms, 380, 760, Curves.easeIn));
-    if (coreAlpha > 0.01) {
-      _fill
-        ..shader = null
-        ..color = _cyan.withValues(alpha: coreAlpha);
-      canvas.drawCircle(Offset.zero, 0.85, _fill);
-      _fill.color = _ice.withValues(alpha: coreAlpha);
-      canvas.drawCircle(Offset.zero, 0.5, _fill);
-    }
-
-    if (discAlpha > 0.01) {
-      // Navy disc: at full zoom it fills the screen as the hand-off colour.
-      _fill
-        ..shader = _discShader
-        ..color = Colors.white.withValues(alpha: discAlpha);
-      canvas.drawCircle(Offset.zero, 1, _fill);
-      _fill.shader = null;
-
-      // Rim
-      _line
-        ..shader = null
-        ..strokeWidth = 0.035
-        ..color = _cyan.withValues(alpha: 0.45 * discAlpha);
-      canvas.drawCircle(Offset.zero, 0.985, _line);
-
-      // Meter arc: 270° gauge, gap at the bottom, ticking up clockwise.
-      final detail = discAlpha * (1.0 - _seg(zoomP, 0.0, 0.55));
-      if (detail > 0.01) {
-        const start = math.pi * 0.75;
-        const sweep = math.pi * 1.5;
-        final arcRect = Rect.fromCircle(center: Offset.zero, radius: 0.72);
-        _line
-          ..strokeWidth = 0.11
-          ..color = Colors.white.withValues(alpha: 0.10 * detail);
-        canvas.drawArc(arcRect, start, sweep, false, _line);
-        if (arcP > 0) {
-          _line.color = _cyan.withValues(alpha: detail);
-          canvas.drawArc(arcRect, start, sweep * arcP, false, _line);
-          if (arcP < 1) {
-            final a = start + sweep * arcP;
-            final tip = Offset(math.cos(a) * 0.72, math.sin(a) * 0.72);
-            _fill.color = Colors.white.withValues(alpha: detail);
-            canvas.drawCircle(tip, 0.075, _fill);
-          }
-        }
-
-        // ₱ — the fare at the heart of the meter.
-        if (pesoP > 0) {
-          canvas.save();
-          canvas.scale(0.72 + 0.28 * pesoP);
-          _line
-            ..strokeWidth = 0.115
-            ..color = Colors.white.withValues(alpha: pesoP * detail);
-          canvas.drawPath(_pesoBody, _line);
-          _line.strokeWidth = 0.085;
-          canvas.drawPath(_pesoBars, _line);
-          canvas.restore();
-        }
-      }
-    }
-    canvas.restore();
-  }
-
-  void _paintLetters(
-      Canvas canvas, _Layout g, double ms, double alpha, double drop) {
-    final img = image!;
-    for (var i = 0; i < _letterCuts.length - 1; i++) {
-      final start = 960.0 + i * 70;
-      final p = _seg(ms, start, start + 360, Curves.easeOutCubic);
-      if (p <= 0) continue;
-      final src = Rect.fromLTRB(
-          _letterCuts[i], _lettersTop, _letterCuts[i + 1], _lettersBottom);
-      final dst = g.logoRect(src).shift(Offset(0, 12 * (1 - p) + drop));
-      _imagePaint.color = Colors.white.withValues(alpha: p * alpha);
-      canvas.drawImageRect(img, src, dst, _imagePaint);
-    }
-  }
-
-  void _paintMeterLabel(
-      Canvas canvas, _Layout g, double ms, double alpha, double drop) {
-    final p = _seg(ms, 1460, 1760, Curves.easeOutCubic);
-    if (p <= 0) return;
-    final dst = g.logoRect(_meterSrc).shift(Offset(-10 * (1 - p), drop));
-    _imagePaint.color = Colors.white.withValues(alpha: p * alpha);
-    canvas.drawImageRect(image!, _meterSrc, dst, _imagePaint);
-  }
-
-  void _paintRoad(
-      Canvas canvas, _Layout g, double ms, double alpha, double drop) {
-    final q = _seg(ms, 1300, 1950, Curves.easeInOutCubic);
-    if (q <= 0) return;
-    final src = Rect.fromLTRB(_roadSrc.left, _roadSrc.top,
-        _roadSrc.left + _roadSrc.width * q, _roadSrc.bottom);
-    final dst = g.logoRect(src).shift(Offset(0, drop));
-    _imagePaint.color = Colors.white.withValues(alpha: alpha);
-    canvas.drawImageRect(image!, src, dst, _imagePaint);
-
-    // Headlight at the leading edge while the road is still driving in.
-    final head = (1.0 - _seg(q, 0.85, 1.0)) * alpha;
-    if (head > 0.01) {
-      final c = Offset(dst.right, dst.center.dy - 2);
-      _fill.shader = null;
-      for (final (rad, a) in const [(14.0, 0.10), (7.0, 0.28), (3.2, 0.95)]) {
-        _fill.color =
-            (a > 0.5 ? Colors.white : _cyan).withValues(alpha: a * head);
-        canvas.drawCircle(c, rad, _fill);
-      }
-    }
-  }
-
-  void _paintTagline(Canvas canvas, _Layout g, double ms, double alpha) {
-    final inP = _seg(ms, 1800, 2160, Curves.easeOutCubic);
-    final p = inP * alpha;
-    if (p <= 0.01) return;
-    final step = (p * 20).round(); // 21 cached layouts at most
-    final tp = _taglineCache.putIfAbsent(step, () {
-      final base = taglineStyle.color ?? Colors.white;
-      return TextPainter(
-        text: TextSpan(
-          text: 'Know your fare. Plan your byahe.',
-          style: taglineStyle.copyWith(
-            color: base.withValues(alpha: base.a * step / 20),
-          ),
-        ),
-        textAlign: TextAlign.center,
-        textDirection: TextDirection.ltr,
-        maxLines: 2,
-      )..layout(maxWidth: g.size.width - 48);
-    });
-    tp.paint(
-      canvas,
-      Offset((g.size.width - tp.width) / 2, g.taglineTop + 6 * (1 - inP)),
+    final w = size.width, h = size.height;
+    final logoW = (w * (w >= 600 ? 0.46 : 0.78)).clamp(260.0, 440.0);
+    final logoH = logoW * 414 / 1230;
+    final logo = Rect.fromCenter(
+      center: Offset(w / 2, h / 2 - h * 0.02),
+      width: logoW,
+      height: logoH,
     );
+
+    final p = particles;
+    final ignite = _seg(ms, 900, 1350, Curves.easeInOut);
+    final breakUp = _seg(ms, 2000, 2280, Curves.easeIn);
+    // Without particles (sampling failed) the crisp logo simply fades in.
+    final imageAlpha = (p == null ? _seg(ms, 0, 500) : ignite) * (1 - breakUp);
+    final particleAlpha =
+        math.max(1 - ignite, breakUp) * (1 - _seg(ms, 2550, _totalMs));
+
+    if (p != null && particleAlpha > 0.01) {
+      _paintParticles(canvas, size, logo, p, ms, particleAlpha);
+    }
+
+    final img = image;
+    if (img == null || imageAlpha <= 0.01) return;
+    final src = cropOf(img.width);
+    _imagePaint
+      ..blendMode = BlendMode.srcOver
+      ..color = Colors.white.withValues(alpha: imageAlpha);
+    canvas.drawImageRect(img, src, logo, _imagePaint);
+
+    // Ignition flare: the logo drawn over itself additively, once.
+    final flare = math.sin(_seg(ms, 1100, 1550) * math.pi) * 0.55;
+    if (flare > 0.01) {
+      _imagePaint
+        ..blendMode = BlendMode.plus
+        ..color = Colors.white.withValues(alpha: flare * imageAlpha);
+      canvas.drawImageRect(img, src, logo, _imagePaint);
+    }
+
+    // Sheen: a slanted band of light, clipped, re-drawing only logo pixels.
+    final s = _seg(ms, 1350, 1950, Curves.easeInOutSine);
+    if (s > 0 && s < 1) {
+      final cx = logo.left - logoW * 0.25 + logoW * 1.5 * s;
+      final band = logoW * 0.09;
+      final slant = logoH * 0.6;
+      canvas.save();
+      canvas.clipPath(
+        Path()
+          ..moveTo(cx - band + slant, logo.top)
+          ..lineTo(cx + band + slant, logo.top)
+          ..lineTo(cx + band - slant, logo.bottom)
+          ..lineTo(cx - band - slant, logo.bottom)
+          ..close(),
+      );
+      _sheenPaint.color = Colors.white.withValues(alpha: imageAlpha);
+      canvas.drawImageRect(img, src, logo, _sheenPaint);
+      canvas.restore();
+    }
+  }
+
+  /// Each particle is a short line from where it was a moment ago to where it
+  /// is now, so fast ones become light trails and settled ones become dots.
+  void _paintParticles(
+    Canvas canvas,
+    Size size,
+    Rect logo,
+    _Particles p,
+    double ms,
+    double alpha,
+  ) {
+    final n = p.length;
+    final wb = _whiteBuf ??= Float32List(n * 4);
+    final bb = _blueBuf ??= Float32List(n * 4);
+    var wi = 0, bi = 0;
+    final w = size.width, h = size.height;
+
+    for (var i = 0; i < n; i++) {
+      final tx = logo.left + p.x[i] * logo.width;
+      final ty = logo.top + p.y[i] * logo.height;
+      double hx, hy, ox, oy;
+
+      if (ms < 2000) {
+        // Inflow: lanes from off-screen left; left side of the logo lands first.
+        final u = (ms / 1100 - (0.42 * p.x[i] + 0.30 * p.r1[i])) / 0.5;
+        if (u <= 0) continue;
+        final sx = -(0.08 + 0.9 * p.r2[i]) * w;
+        final sy = ty + (p.r3[i] - 0.5) * h * 0.16;
+        final a = u > 1 ? 1.0 : u,
+            b = u - 0.07 < 0 ? 0.0 : (u - 0.07 > 1 ? 1.0 : u - 0.07);
+        final ia = 1 - a, ib = 1 - b;
+        // x: easeOutQuart, y: easeOutCubic (lanes merge a touch later).
+        hx = sx + (tx - sx) * (1 - ia * ia * ia * ia);
+        hy = sy + (ty - sy) * (1 - ia * ia * ia);
+        ox = sx + (tx - sx) * (1 - ib * ib * ib * ib);
+        oy = sy + (ty - sy) * (1 - ib * ib * ib);
+      } else {
+        // Departure: right side launches first, accelerating off-screen.
+        final v =
+            ((ms - 2000) / 800 - (0.22 * (1 - p.x[i]) + 0.10 * p.r1[i])) / 0.62;
+        final a = v < 0 ? 0.0 : (v > 1 ? 1.0 : v);
+        final b = v - 0.06 < 0 ? 0.0 : (v - 0.06 > 1 ? 1.0 : v - 0.06);
+        final reach = w * 1.2 + p.r2[i] * w * 0.8;
+        final drift = (p.r3[i] - 0.5) * h * 0.07;
+        final ea = a * a * a, eb = b * b * b; // easeInCubic
+        hx = tx + ea * reach;
+        hy = ty + ea * drift;
+        ox = tx + eb * reach;
+        oy = ty + eb * drift;
+      }
+
+      if (p.cyan[i]) {
+        bb[bi++] = ox;
+        bb[bi++] = oy;
+        bb[bi++] = hx;
+        bb[bi++] = hy;
+      } else {
+        wb[wi++] = ox;
+        wb[wi++] = oy;
+        wb[wi++] = hx;
+        wb[wi++] = hy;
+      }
+    }
+
+    // Moving light is thin and dim (additive trails would saturate to a
+    // solid wedge); it thickens and brightens as points land.
+    final landed = ms < 2000 ? _seg(ms, 600, 1000) : 0.0;
+    final dot = math.max(1.2, p.dot * logo.width * 1.15);
+    final width = dot * (0.42 + 0.58 * landed);
+    final glow = alpha * (0.22 + 0.70 * landed);
+    _white
+      ..strokeWidth = width
+      ..color = Colors.white.withValues(alpha: glow);
+    _blue
+      ..strokeWidth = width
+      ..color = _cyan.withValues(alpha: math.min(1.0, glow * 1.15));
+    if (wi > 0) {
+      canvas.drawRawPoints(
+        ui.PointMode.lines,
+        Float32List.sublistView(wb, 0, wi),
+        _white,
+      );
+    }
+    if (bi > 0) {
+      canvas.drawRawPoints(
+        ui.PointMode.lines,
+        Float32List.sublistView(bb, 0, bi),
+        _blue,
+      );
+    }
   }
 
   @override
   bool shouldRepaint(covariant _SplashPainter old) =>
-      old.image != image || old.taglineStyle != taglineStyle;
-}
-
-/// Responsive geometry: badge above the wordmark, the group centred on screen.
-class _Layout {
-  final Size size;
-  late final double r; // badge radius
-  late final Offset badge;
-  late final double logoScale; // logical px per source px
-  late final Offset logoOrigin; // where source (_srcLeft, _srcTop) lands
-  late final double taglineTop;
-  late final double coverScale; // badge scale that covers the whole screen
-
-  _Layout(this.size) {
-    final w = size.width, h = size.height;
-    final isTablet = w >= 600;
-    final d = (w * (isTablet ? 0.15 : 0.27)).clamp(84.0, 124.0);
-    r = d / 2;
-    final logoW = (w * (isTablet ? 0.40 : 0.64)).clamp(230.0, 360.0);
-    logoScale = logoW / (_SplashPainter._srcRight - _SplashPainter._srcLeft);
-    final logoH =
-        (_SplashPainter._roadSrc.bottom - _SplashPainter._srcTop) * logoScale;
-
-    final gapBadge = d * 0.34;
-    const gapTag = 18.0, tagH = 20.0;
-    final group = d + gapBadge + logoH + gapTag + tagH;
-    final top = (h - group) / 2 - h * 0.02;
-
-    badge = Offset(w / 2, top + r);
-    logoOrigin = Offset((w - logoW) / 2, top + d + gapBadge);
-    taglineTop = logoOrigin.dy + logoH + gapTag;
-
-    final far = math.sqrt(math.pow(math.max(badge.dx, w - badge.dx), 2) +
-        math.pow(math.max(badge.dy, h - badge.dy), 2));
-    coverScale = far / r * 1.08;
-  }
-
-  Rect logoRect(Rect src) => Rect.fromLTRB(
-        logoOrigin.dx + (src.left - _SplashPainter._srcLeft) * logoScale,
-        logoOrigin.dy + (src.top - _SplashPainter._srcTop) * logoScale,
-        logoOrigin.dx + (src.right - _SplashPainter._srcLeft) * logoScale,
-        logoOrigin.dy + (src.bottom - _SplashPainter._srcTop) * logoScale,
-      );
+      old.image != image || old.particles != particles;
 }
