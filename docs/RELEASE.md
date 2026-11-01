@@ -62,10 +62,10 @@ SDK report may list Firebase; answer that it is unused.
    - App ID `ph.biyahemeter.app` with the **App Groups** capability
    - App ID `ph.biyahemeter.app.BiyaheMeterWidget` with **App Groups**
    - App Group `group.ph.biyahemeter.app`
-2. Create the widget extension target and add the App Group to both targets,
-   following [ios/BiyaheMeterWidget/README.md](../ios/BiyaheMeterWidget/README.md).
-3. In Xcode, set the Team under Signing & Capabilities for `Runner` and
-   `BiyaheMeterWidget`, then `flutter build ipa`.
+2. In Xcode, set the Team under Signing & Capabilities for `Runner` and
+   `BiyaheMeterWidget`, then `flutter build ipa`. The widget extension target,
+   its App Group entitlements and its privacy manifest are already in the
+   project ([ios/BiyaheMeterWidget/README.md](../ios/BiyaheMeterWidget/README.md)).
 
 ## Store listing
 
@@ -121,8 +121,8 @@ Play Console → App content → **Foreground service permissions** →
   > while the phone is locked. The blue location indicator is shown. Tracking
   > stops when the trip stops. A Live Activity shows the running fare.
   > No account is needed."
-- Required before upload: iOS build tested on a real iPhone via TestFlight;
-  Live Activity extension created with its `PrivacyInfo.xcprivacy`
+- Required before upload: iOS build tested on a real iPhone via TestFlight,
+  including the Live Activity
   ([ios/BiyaheMeterWidget/README.md](../ios/BiyaheMeterWidget/README.md)).
 
 ### Maps

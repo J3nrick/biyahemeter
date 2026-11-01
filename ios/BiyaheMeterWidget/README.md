@@ -1,38 +1,36 @@
 # BiyaheMeterWidget — iOS Live Activity
 
 Shows the running fare, distance and time on the Lock Screen and in the Dynamic
-Island while a trip is metering. The Swift files here are ready; the Xcode target
-has to be created on a Mac (it cannot be generated or built on Windows).
+Island while a trip is metering.
 
 Data flow: `lib/services/trip_live_service.dart` → `live_activities` plugin →
 shared App Group `UserDefaults` → `BiyaheMeterLiveActivity.swift`.
 
-## One-time Xcode setup (Mac)
+## What's already set up
 
-1. `cd biyahemeter && flutter build ios --config-only`, then open
-   `ios/Runner.xcworkspace`.
-2. **File → New → Target → Widget Extension**. Product name `BiyaheMeterWidget`,
-   tick **Include Live Activity**, untick Configuration Intent. Deployment target
-   iOS 16.1 or later. When asked, *don't* activate the new scheme.
-3. Xcode creates its own sample files in `ios/BiyaheMeterWidget/`. Delete the
-   generated `*.swift` files **except** keep its `Info.plist` and asset catalog, and add
-   the three files from this folder (`BiyaheMeterLiveActivity.swift`,
-   `BiyaheMeterWidgetBundle.swift` and `PrivacyInfo.xcprivacy`) to the
-   **BiyaheMeterWidget** target. The privacy manifest is required: App Store
-   Connect rejects uploads whose extension uses `UserDefaults` without one
-   (ITMS-91053). Check that it appears under the target's *Copy Bundle Resources*.
-4. In the extension's `Info.plist` add `NSSupportsLiveActivities` = `YES`
-   (Runner's `Info.plist` already has it).
-5. **Signing & Capabilities → + Capability → App Groups** on **both** `Runner` and
-   `BiyaheMeterWidget`, and add `group.ph.biyahemeter.app`.
-   - If you change the group id, also change `TripLiveService.appGroupId` and
-     `sharedDefaults` in `BiyaheMeterLiveActivity.swift`.
-   - Register the app id `ph.biyahemeter.app`, the extension id
-     `ph.biyahemeter.app.BiyaheMeterWidget` and the App Group in your Apple
-     Developer account first (Certificates, Identifiers & Profiles).
-6. Runner target → **Build Phases**: drag **Embed Foundation Extensions** above
-   **Run Script** (Thin Binary) to avoid a "Cycle inside Runner" build error.
-7. `flutter run` on a real iPhone (Live Activities don't render in every simulator).
+The `BiyaheMeterWidget` app-extension target is in `ios/Runner.xcodeproj`
+(iOS 16.1+, bundle id `ph.biyahemeter.app.BiyaheMeterWidget`). It compiles
+`BiyaheMeterLiveActivity.swift` and `BiyaheMeterWidgetBundle.swift`, copies
+`PrivacyInfo.xcprivacy` (App Store Connect rejects an extension that uses
+`UserDefaults` without one, ITMS-91053), uses this folder's `Info.plist`
+(`NSSupportsLiveActivities` = YES) and is embedded in Runner by an
+*Embed Foundation Extensions* phase that sits before Flutter's *Thin Binary*
+script (otherwise Xcode reports a build cycle). Both targets have the App Group
+`group.ph.biyahemeter.app` in their `.entitlements` files. CI's `build-ios` job
+compiles it on every push.
+
+If you change the group id, change it in `Runner/Runner.entitlements`,
+`BiyaheMeterWidget.entitlements`, `TripLiveService.appGroupId` and
+`sharedDefaults` in `BiyaheMeterLiveActivity.swift`.
+
+## Signing (Mac, Apple Developer account)
+
+1. In Certificates, Identifiers & Profiles, register the app id
+   `ph.biyahemeter.app`, the extension id `ph.biyahemeter.app.BiyaheMeterWidget`
+   (both with **App Groups**) and the App Group `group.ph.biyahemeter.app`.
+2. Open `ios/Runner.xcworkspace`, and under **Signing & Capabilities** pick your
+   Team for both `Runner` and `BiyaheMeterWidget`.
+3. `flutter run` on a real iPhone (Live Activities don't render in every simulator).
 
 ## Check
 
