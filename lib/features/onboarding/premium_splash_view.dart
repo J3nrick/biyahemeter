@@ -13,9 +13,10 @@ import 'package:biyahe_meter/features/onboarding/agreements_screen.dart';
 ///               stream in from the left like headlights, leaving light trails,
 ///               and land on their exact pixel (left→right, like the road bar).
 /// - 0.90–1.45s  Ignition: the crisp HD logo takes over with a brief flare.
-/// - 1.35–1.95s  Sheen: a specular band sweeps the letters.
-/// - 2.00–2.80s  Departure: the logo breaks back into light and launches off
-///               to the right, leaving a clear screen for the app.
+/// - 1.35–1.95s  Sheen: a specular band sweeps the letters; tagline fades in.
+/// - 2.00–2.80s  Zoom-through: the logo bursts into light toward the viewer
+///               while the app fades in underneath (handed off at 2.30s).
+/// Tap anywhere to skip.
 ///
 /// PERFORMANCE (see memory-bank/activeContext.md, do not regress):
 /// - ONE [CustomPainter] repainted by the controller; zero widget rebuilds.
@@ -54,6 +55,7 @@ class _SplashScreenState extends State<SplashScreen>
   bool _resolved = false;
   bool _started = false;
   bool _warming = false;
+  bool _done = false;
 
   Timer? _startFallback;
   Timer? _safetyTimer;
@@ -71,6 +73,10 @@ class _SplashScreenState extends State<SplashScreen>
       if (status == AnimationStatus.completed) {
         _proceed();
       }
+    });
+    // Hand off mid-burst so the app fades in behind the flying light.
+    _anim.addListener(() {
+      if (_anim.value >= _SplashPainter.handoffFrame) _proceed();
     });
 
     // Never block the app: covers slow decode + sampling + shader warm-up.
@@ -180,7 +186,8 @@ class _SplashScreenState extends State<SplashScreen>
   void _proceed() {
     _safetyTimer?.cancel();
     _safetyTimer = null;
-    if (!mounted) return;
+    if (!mounted || _done) return;
+    _done = true;
 
     if (widget.onFinish != null) {
       widget.onFinish!();
@@ -227,43 +234,50 @@ class _SplashScreenState extends State<SplashScreen>
         systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
-        backgroundColor: const Color(0xFF03050C),
+        // Same flat navy as the native launch screen, so there's no blink.
+        backgroundColor: _SplashPainter.launchNavy,
         body: Semantics(
           container: true,
           label: 'Biyahe Meter',
-          child: ExcludeSemantics(
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                // Static backdrop (matches web/index.html's loader), rasterised once.
-                const RepaintBoundary(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: Alignment(0.0, -0.05),
-                        radius: 1.35,
-                        colors: [
-                          Color(0xFF0C1B3E),
-                          Color(0xFF060D20),
-                          Color(0xFF020409),
-                        ],
-                        stops: [0.0, 0.58, 1.0],
+          onTapHint: 'Skip',
+          onTap: _proceed,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: _proceed,
+            child: ExcludeSemantics(
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Static backdrop (matches web/index.html's loader), rasterised once.
+                  const RepaintBoundary(
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: RadialGradient(
+                          center: Alignment(0.0, -0.05),
+                          radius: 1.35,
+                          colors: [
+                            Color(0xFF0C1B3E),
+                            Color(0xFF060D20),
+                            Color(0xFF020409),
+                          ],
+                          stops: [0.0, 0.58, 1.0],
+                        ),
                       ),
                     ),
                   ),
-                ),
-                RepaintBoundary(
-                  child: CustomPaint(
-                    painter: _SplashPainter(
-                      anim: _anim,
-                      image: _logoInfo?.image,
-                      particles: _particles,
+                  RepaintBoundary(
+                    child: CustomPaint(
+                      painter: _SplashPainter(
+                        anim: _anim,
+                        image: _logoInfo?.image,
+                        particles: _particles,
+                      ),
+                      isComplex: true,
+                      willChange: true,
                     ),
-                    isComplex: true,
-                    willChange: true,
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -364,6 +378,12 @@ class _SplashPainter extends CustomPainter {
   /// Value where the crisp logo is fully in and still (reduced motion).
   static const double composedFrame = 1990 / _totalMs;
 
+  /// Value where [SplashScreen.onFinish] fires, mid zoom-through.
+  static const double handoffFrame = 2300 / _totalMs;
+
+  static const launchNavy = Color(0xFF060D20);
+  static const _tagline = 'Sakay na.';
+
   static const _cyan = Color(0xFF38BDF8);
 
   /// Visible logo inside logo_dark_hd.png (1308 × 452), scaled to [imgW].
@@ -404,6 +424,15 @@ class _SplashPainter extends CustomPainter {
       height: logoH,
     );
 
+    // Veil of launch navy over the gradient backdrop, lifting as light arrives.
+    final veil = 1 - _seg(ms, 0, 500, Curves.easeOut);
+    if (veil > 0.01) {
+      canvas.drawRect(
+        Offset.zero & size,
+        Paint()..color = launchNavy.withValues(alpha: veil),
+      );
+    }
+
     final p = particles;
     final ignite = _seg(ms, 900, 1350, Curves.easeInOut);
     final breakUp = _seg(ms, 2000, 2280, Curves.easeIn);
@@ -415,6 +444,9 @@ class _SplashPainter extends CustomPainter {
     if (p != null && particleAlpha > 0.01) {
       _paintParticles(canvas, size, logo, p, ms, particleAlpha);
     }
+
+    final tagAlpha = _seg(ms, 1450, 1800, Curves.easeOut) * (1 - breakUp);
+    if (tagAlpha > 0.01) _paintTagline(canvas, logo, tagAlpha);
 
     final img = image;
     if (img == null || imageAlpha <= 0.01) return;
@@ -454,6 +486,27 @@ class _SplashPainter extends CustomPainter {
     }
   }
 
+  /// Laid out per frame while visible (~0.5 s): a 9-char string is cheap, and
+  /// colour alpha avoids a saveLayer.
+  void _paintTagline(Canvas canvas, Rect logo, double alpha) {
+    final fontSize = (logo.width * 0.062).clamp(15.0, 24.0);
+    final tp = TextPainter(
+      text: TextSpan(
+        text: _tagline,
+        style: TextStyle(
+          color: Colors.white.withValues(alpha: 0.72 * alpha),
+          fontSize: fontSize,
+          fontWeight: FontWeight.w500,
+          letterSpacing: fontSize * 0.18,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    final y = logo.bottom + logo.height * 0.22 + (1 - alpha) * 6;
+    tp.paint(canvas, Offset(logo.center.dx - tp.width / 2, y));
+    tp.dispose();
+  }
+
   /// Each particle is a short line from where it was a moment ago to where it
   /// is now, so fast ones become light trails and settled ones become dots.
   void _paintParticles(
@@ -490,18 +543,18 @@ class _SplashPainter extends CustomPainter {
         ox = sx + (tx - sx) * (1 - ib * ib * ib * ib);
         oy = sy + (ty - sy) * (1 - ib * ib * ib);
       } else {
-        // Departure: right side launches first, accelerating off-screen.
-        final v =
-            ((ms - 2000) / 800 - (0.22 * (1 - p.x[i]) + 0.10 * p.r1[i])) / 0.62;
+        // Zoom-through: every point flies outward from the logo's centre, as
+        // if the camera dives through it; outer points stream past first.
+        final v = ((ms - 2000) / 800 - 0.18 * p.r1[i]) / 0.7;
         final a = v < 0 ? 0.0 : (v > 1 ? 1.0 : v);
         final b = v - 0.06 < 0 ? 0.0 : (v - 0.06 > 1 ? 1.0 : v - 0.06);
-        final reach = w * 1.2 + p.r2[i] * w * 0.8;
-        final drift = (p.r3[i] - 0.5) * h * 0.07;
-        final ea = a * a * a, eb = b * b * b; // easeInCubic
-        hx = tx + ea * reach;
-        hy = ty + ea * drift;
-        ox = tx + eb * reach;
-        oy = ty + eb * drift;
+        final k = 5 + 9 * p.r2[i];
+        final dx = tx - logo.center.dx, dy = ty - logo.center.dy;
+        final ea = a * a * a * k, eb = b * b * b * k; // easeInCubic
+        hx = tx + dx * ea;
+        hy = ty + dy * ea + (p.r3[i] - 0.5) * h * 0.04 * ea;
+        ox = tx + dx * eb;
+        oy = ty + dy * eb + (p.r3[i] - 0.5) * h * 0.04 * eb;
       }
 
       if (p.cyan[i]) {

@@ -54,4 +54,15 @@ void main() {
     await tester.pump(const Duration(milliseconds: 600));
     expect(finished, isTrue);
   });
+
+  testWidgets('a tap skips the splash', (tester) async {
+    var finished = 0;
+    await tester.pumpWidget(
+      MaterialApp(home: SplashScreen(onFinish: () => finished++)),
+    );
+    await tester.pump(const Duration(milliseconds: 300));
+    await tester.tap(find.byType(SplashScreen));
+    await tester.pump(const Duration(seconds: 6));
+    expect(finished, 1); // once, even though the timeline keeps running
+  });
 }
