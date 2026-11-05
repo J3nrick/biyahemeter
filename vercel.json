@@ -1,7 +1,7 @@
 {
-  "buildCommand": "",
+  "buildCommand": "flutter/bin/flutter build web --release",
   "outputDirectory": "build/web",
-  "installCommand": "",
+  "installCommand": "git clone --depth 1 -b 3.38.7 https://github.com/flutter/flutter.git && flutter/bin/flutter config --no-analytics && flutter/bin/flutter pub get",
   "framework": null,
   "headers": [
     {

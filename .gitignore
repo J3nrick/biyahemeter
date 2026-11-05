@@ -31,10 +31,9 @@ scratch/
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-# Exclude all build artifacts EXCEPT the compiled web output for Vercel
-/build/[!w]*
-/build/w[!e]*
-/build/we[!b]*
+# Vercel builds the web app itself (vercel.json); no build output in git.
+/build/
+/flutter/
 /coverage/
 
 # Symbolication related
