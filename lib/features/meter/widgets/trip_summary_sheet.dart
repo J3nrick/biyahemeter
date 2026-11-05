@@ -1,6 +1,10 @@
+import 'dart:ui' as ui;
+
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:intl/intl.dart';
+import 'package:latlong2/latlong.dart' show LatLng;
 import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import 'package:biyahe_meter/core/models/trip_record.dart';
@@ -9,6 +13,7 @@ import 'package:biyahe_meter/core/utils/trip_calculator.dart';
 import 'package:biyahe_meter/features/history/history_provider.dart';
 import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/meter/widgets/premium_buttons.dart';
+import 'package:biyahe_meter/features/meter/widgets/trip_card.dart';
 import 'package:biyahe_meter/services/receipt_service.dart';
 
 Future<void> showTripSummarySheet(BuildContext context) async {
@@ -48,6 +53,8 @@ Future<void> showTripSummarySheet(BuildContext context) async {
     endLng: meter.currentPosition?.longitude,
   );
 
+  // Copied now: the meter clears its route when the next trip starts.
+  final route = meter.routePoints.toList();
   await context.read<HistoryProvider>().addTrip(trip);
 
   if (!context.mounted) return;
@@ -56,14 +63,31 @@ Future<void> showTripSummarySheet(BuildContext context) async {
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => _TripSummarySheet(trip: trip),
+    builder: (ctx) => _TripSummarySheet(trip: trip, route: route),
   );
 }
 
 class _TripSummarySheet extends StatelessWidget {
   final TripRecord trip;
 
-  const _TripSummarySheet({required this.trip});
+  final List<LatLng> route;
+  final _cardKey = GlobalKey();
+
+  _TripSummarySheet({required this.trip, required this.route});
+
+  Future<void> _shareCard(ReceiptService receipt) async {
+    try {
+      final boundary =
+          _cardKey.currentContext!.findRenderObject()! as RenderRepaintBoundary;
+      final image = await boundary.toImage(pixelRatio: 3);
+      final png = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      await receipt.shareImage(trip, png!.buffer.asUint8List());
+    } catch (_) {
+      // Image capture or file sharing unsupported here: text always works.
+      await receipt.shareSummaryText(trip);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -121,22 +145,40 @@ class _TripSummarySheet extends StatelessWidget {
                   style: theme.textTheme.bodySmall?.copyWith(color: muted),
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  money.format(trip.totalFare),
-                  style: theme.textTheme.displayMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: -1,
+                RepaintBoundary(
+                  key: _cardKey,
+                  child: TripCard(
+                    trip: trip,
+                    route: route,
+                    fareStyle: AppTheme.fareStyle(
+                      brightness: Brightness.dark,
+                      fontSize: 38,
+                      color: Colors.white,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
-                _line(context, 'Distance',
-                    '${trip.distanceKm.toStringAsFixed(2)} km'),
-                _line(context, 'Duration',
-                    '${trip.duration.inMinutes}m ${trip.duration.inSeconds % 60}s'),
-                _line(context, 'Avg speed',
-                    '${trip.averageSpeedKmh.toStringAsFixed(1)} km/h'),
+                _line(
+                  context,
+                  'Distance',
+                  '${trip.distanceKm.toStringAsFixed(2)} km',
+                ),
+                _line(
+                  context,
+                  'Duration',
+                  '${trip.duration.inMinutes}m ${trip.duration.inSeconds % 60}s',
+                ),
+                _line(
+                  context,
+                  'Avg speed',
+                  '${trip.averageSpeedKmh.toStringAsFixed(1)} km/h',
+                ),
                 _line(context, 'Flagdown', money.format(trip.baseFare)),
-                _line(context, 'Distance fare', money.format(trip.distanceFare)),
+                _line(
+                  context,
+                  'Distance fare',
+                  money.format(trip.distanceFare),
+                ),
                 _line(context, 'Waiting fare', money.format(trip.waitingFare)),
                 if (trip.discountApplied)
                   _line(
@@ -158,9 +200,16 @@ class _TripSummarySheet extends StatelessWidget {
                   ),
                 const SizedBox(height: 18),
                 PremiumConfirmButton(
-                  label: 'Share Trip Summary',
+                  label: 'Share trip card',
                   enabled: true,
                   icon: CupertinoIcons.share,
+                  onPressed: () => _shareCard(receipt),
+                ),
+                const SizedBox(height: 8),
+                PremiumSurfaceButton(
+                  icon: CupertinoIcons.doc,
+                  title: 'Share PDF receipt',
+                  subtitle: 'For records and reimbursement',
                   onPressed: () => receipt.sharePdf(trip),
                 ),
                 const SizedBox(height: 8),
@@ -190,8 +239,6 @@ class _TripSummarySheet extends StatelessWidget {
     );
   }
 
-
-
   Widget _line(BuildContext context, String label, String value) {
     final muted = AppTheme.mutedOf(context);
     return Padding(
@@ -201,17 +248,16 @@ class _TripSummarySheet extends StatelessWidget {
           Expanded(
             child: Text(
               label,
-              style: Theme.of(context)
-                  .textTheme
-                  .bodyMedium
-                  ?.copyWith(color: muted),
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: muted),
             ),
           ),
           Text(
             value,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
           ),
         ],
       ),

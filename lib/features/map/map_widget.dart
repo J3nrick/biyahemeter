@@ -11,6 +11,9 @@ import 'package:biyahe_meter/features/meter/meter_provider.dart';
 import 'package:biyahe_meter/features/meter/widgets/premium_buttons.dart';
 import 'package:biyahe_meter/services/map_cache_service.dart';
 
+/// The logo's cyan (the road bar), used for the live end of the route.
+const _routeCyan = Color(0xFF38BDF8);
+
 class MapWidget extends StatefulWidget {
   const MapWidget({super.key});
 
@@ -67,8 +70,9 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
       if (permission == LocationPermission.deniedForever) return;
 
       final pos = await Geolocator.getCurrentPosition(
-        locationSettings:
-            const LocationSettings(accuracy: LocationAccuracy.high),
+        locationSettings: const LocationSettings(
+          accuracy: LocationAccuracy.high,
+        ),
       );
 
       if (!mounted) return;
@@ -113,10 +117,14 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     final startCenter = _mapController.camera.center;
     final startZoom = _mapController.camera.zoom;
 
-    final latTween =
-        Tween<double>(begin: startCenter.latitude, end: target.latitude);
-    final lngTween =
-        Tween<double>(begin: startCenter.longitude, end: target.longitude);
+    final latTween = Tween<double>(
+      begin: startCenter.latitude,
+      end: target.latitude,
+    );
+    final lngTween = Tween<double>(
+      begin: startCenter.longitude,
+      end: target.longitude,
+    );
     final zoomTween = Tween<double>(begin: startZoom, end: targetZoom);
 
     final controller = AnimationController(
@@ -133,10 +141,7 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
     controller.addListener(() {
       if (!mounted) return;
       _mapController.move(
-        LatLng(
-          latTween.evaluate(animation),
-          lngTween.evaluate(animation),
-        ),
+        LatLng(latTween.evaluate(animation), lngTween.evaluate(animation)),
         zoomTween.evaluate(animation),
       );
     });
@@ -146,13 +151,16 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
 
   /// Re-enable auto-follow and snap smoothly back to current location.
   void _recenter() {
-    final pos = context.read<MeterProvider>().currentPosition ??
+    final pos =
+        context.read<MeterProvider>().currentPosition ??
         _initialPosition ??
         _defaultCenter;
     setState(() => _isFollowing = true);
     const zoom = 15.0;
-    final target =
-        LatLng(pos.latitude - _latOffsetForPanel(zoom), pos.longitude);
+    final target = LatLng(
+      pos.latitude - _latOffsetForPanel(zoom),
+      pos.longitude,
+    );
     _animateMapMove(target, zoom);
   }
 
@@ -216,14 +224,47 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                 ],
               ),
 
-              // Tracked route polyline
+              // Tracked route: a soft glow under a line that brightens from
+              // where the trip began to where the car is now.
               if (meter.routePoints.length >= 2)
                 PolylineLayer(
                   polylines: [
                     Polyline(
                       points: meter.routePoints,
-                      strokeWidth: 5.0,
-                      color: Theme.of(context).colorScheme.primary,
+                      strokeWidth: 16,
+                      color: _routeCyan.withValues(alpha: 0.18),
+                    ),
+                    Polyline(
+                      points: meter.routePoints,
+                      strokeWidth: 5.5,
+                      borderStrokeWidth: 1.5,
+                      borderColor: Colors.white.withValues(alpha: 0.85),
+                      gradientColors: [
+                        Theme.of(context).colorScheme.primary,
+                        _routeCyan,
+                      ],
+                    ),
+                  ],
+                ),
+
+              // Where the trip started.
+              if (meter.routePoints.length >= 2)
+                MarkerLayer(
+                  markers: [
+                    Marker(
+                      point: meter.routePoints.first,
+                      width: 18,
+                      height: 18,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.primary,
+                            width: 4,
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -274,7 +315,10 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                         onPressed: () {
                           final currentZoom = _mapController.camera.zoom;
                           final nextZoom = (currentZoom + 1.0).clamp(3.0, 19.0);
-                          _animateMapMove(_mapController.camera.center, nextZoom);
+                          _animateMapMove(
+                            _mapController.camera.center,
+                            nextZoom,
+                          );
                         },
                       ),
                       const SizedBox(height: 6),
@@ -284,7 +328,10 @@ class _MapWidgetState extends State<MapWidget> with TickerProviderStateMixin {
                         onPressed: () {
                           final currentZoom = _mapController.camera.zoom;
                           final nextZoom = (currentZoom - 1.0).clamp(3.0, 19.0);
-                          _animateMapMove(_mapController.camera.center, nextZoom);
+                          _animateMapMove(
+                            _mapController.camera.center,
+                            nextZoom,
+                          );
                         },
                       ),
                     ],
