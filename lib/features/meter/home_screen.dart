@@ -52,12 +52,15 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     final meter = context.read<MeterProvider>();
-    _kmController =
-        TextEditingController(text: meter.kmPerLiter.toStringAsFixed(1));
-    _gasController =
-        TextEditingController(text: meter.gasPricePerLiter.toStringAsFixed(2));
-    _baseFareController =
-        TextEditingController(text: meter.baseFare.toStringAsFixed(2));
+    _kmController = TextEditingController(
+      text: meter.kmPerLiter.toStringAsFixed(1),
+    );
+    _gasController = TextEditingController(
+      text: meter.gasPricePerLiter.toStringAsFixed(2),
+    );
+    _baseFareController = TextEditingController(
+      text: meter.baseFare.toStringAsFixed(2),
+    );
   }
 
   @override
@@ -286,7 +289,8 @@ class _TopStatusBar extends StatelessWidget {
     final primary = Theme.of(context).colorScheme.primary;
     final danger = AppTheme.dangerOf(context);
 
-    final gpsLive = meter.lastUpdateTime != null &&
+    final gpsLive =
+        meter.lastUpdateTime != null &&
         DateTime.now().difference(meter.lastUpdateTime!).inSeconds < 30;
     final hasFix = meter.currentPosition != null;
 
@@ -313,10 +317,9 @@ class _TopStatusBar extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: Theme.of(context)
-                .colorScheme
-                .surface
-                .withValues(alpha: 0.88),
+            color: Theme.of(
+              context,
+            ).colorScheme.surface.withValues(alpha: 0.88),
             borderRadius: BorderRadius.circular(18),
             border: Border.all(
               color: AppTheme.borderOf(context).withValues(alpha: 0.55),
@@ -450,10 +453,10 @@ class _DashboardSheet extends StatelessWidget {
     return RepaintBoundary(
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: theme.colorScheme.surface
-              .withValues(alpha: isDark ? 0.94 : 0.97),
-          borderRadius:
-              const BorderRadius.vertical(top: Radius.circular(28)),
+          color: theme.colorScheme.surface.withValues(
+            alpha: isDark ? 0.94 : 0.97,
+          ),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           border: Border.all(
             color: AppTheme.borderOf(context).withValues(alpha: 0.75),
           ),
@@ -468,82 +471,81 @@ class _DashboardSheet extends StatelessWidget {
         child: ClipRRect(
           borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
           child: ListView(
-              controller: scrollController,
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
-              padding: EdgeInsets.fromLTRB(
-                isWide ? 28 : 16,
-                8,
-                isWide ? 28 : 16,
-                bottomPad + keyboard + 20,
-              ),
-              children: [
-                Center(
-                  child: Semantics(
-                    label: 'Drag dashboard',
-                    child: Container(
-                      width: 42,
-                      height: 5,
-                      margin: const EdgeInsets.only(bottom: 10),
-                      decoration: BoxDecoration(
-                        color:
-                            AppTheme.mutedOf(context).withValues(alpha: 0.45),
-                        borderRadius: BorderRadius.circular(99),
-                      ),
+            controller: scrollController,
+            physics: const BouncingScrollPhysics(
+              parent: AlwaysScrollableScrollPhysics(),
+            ),
+            padding: EdgeInsets.fromLTRB(
+              isWide ? 28 : 16,
+              8,
+              isWide ? 28 : 16,
+              bottomPad + keyboard + 20,
+            ),
+            children: [
+              Center(
+                child: Semantics(
+                  label: 'Drag dashboard',
+                  child: Container(
+                    width: 42,
+                    height: 5,
+                    margin: const EdgeInsets.only(bottom: 10),
+                    decoration: BoxDecoration(
+                      color: AppTheme.mutedOf(context).withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(99),
                     ),
                   ),
                 ),
-                _HeaderRow(
-                  themeProvider: themeProvider,
-                  onSettings: onOpenSettings,
-                  onExpand: () => onExpand(0.60),
+              ),
+              _HeaderRow(
+                themeProvider: themeProvider,
+                onSettings: onOpenSettings,
+                onExpand: () => onExpand(0.60),
+              ),
+              const SizedBox(height: 12),
+              _FareHeroCard(meter: meter, compact: isNarrow || isCompact),
+              if (isCompact) ...[
+                const SizedBox(height: 12),
+                _CompactMetricsRow(meter: meter),
+                const SizedBox(height: 12),
+                TripActionButton(
+                  kind: _tripActionKind(meter),
+                  compact: true,
+                  onPressed: onPrimaryAction,
+                ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    'Pull up for full trip controls',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: AppTheme.mutedOf(context),
+                    ),
+                  ),
+                ),
+              ] else ...[
+                const SizedBox(height: 12),
+                _TripStatusBanner(meter: meter),
+                const SizedBox(height: 12),
+                _MetricsGrid(meter: meter),
+                const SizedBox(height: 16),
+                TripActionButton(
+                  kind: _tripActionKind(meter),
+                  compact: isNarrow,
+                  onPressed: onPrimaryAction,
                 ),
                 const SizedBox(height: 12),
-                _FareHeroCard(meter: meter, compact: isNarrow || isCompact),
-                if (isCompact) ...[
-                  const SizedBox(height: 12),
-                  _CompactMetricsRow(meter: meter),
-                  const SizedBox(height: 12),
-                  TripActionButton(
-                    kind: _tripActionKind(meter),
-                    compact: true,
-                    onPressed: onPrimaryAction,
-                  ),
-                  const SizedBox(height: 8),
-                  Center(
-                    child: Text(
-                      'Pull up for full trip controls',
-                      style: theme.textTheme.labelSmall?.copyWith(
-                        color: AppTheme.mutedOf(context),
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  const SizedBox(height: 12),
-                  _TripStatusBanner(meter: meter),
-                  const SizedBox(height: 12),
-                  _MetricsGrid(meter: meter),
-                  const SizedBox(height: 16),
-                  TripActionButton(
-                    kind: _tripActionKind(meter),
-                    compact: isNarrow,
-                    onPressed: onPrimaryAction,
-                  ),
-                  const SizedBox(height: 12),
-                  PremiumSurfaceButton(
-                    icon: CupertinoIcons.slider_horizontal_3,
-                    title: 'Trip settings',
-                    subtitle: 'Fuel efficiency, gas price, base fare',
-                    onPressed: onOpenSettings,
-                  ),
-                ],
+                PremiumSurfaceButton(
+                  icon: CupertinoIcons.slider_horizontal_3,
+                  title: 'Trip settings',
+                  subtitle: 'Fuel efficiency, gas price, base fare',
+                  onPressed: onOpenSettings,
+                ),
               ],
-            ),
+            ],
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
 }
 
 class _HeaderRow extends StatelessWidget {
@@ -612,6 +614,66 @@ TripActionKind _tripActionKind(MeterProvider meter) {
   if (meter.isRunning) return TripActionKind.stop;
   if (meter.canResumeTrip) return TripActionKind.resume;
   return TripActionKind.start;
+}
+
+/// Taximeter-style readout: each digit rolls up on its own when it changes,
+/// so only the centavos move until the pesos tick over.
+@visibleForTesting
+class RollingFare extends StatelessWidget {
+  final String text;
+  final TextStyle style;
+
+  const RollingFare({super.key, required this.text, required this.style});
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = MediaQuery.disableAnimationsOf(context)
+        ? Duration.zero
+        : const Duration(milliseconds: 280);
+    final chars = text.characters.toList();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        for (var i = 0; i < chars.length; i++)
+          _digitSlot(chars[i], chars.length - i, duration),
+      ],
+    );
+  }
+
+  /// Keyed by position from the right so ₱9.99 → ₱10.00 keeps the decimals
+  /// aligned and only adds a slot on the left.
+  Widget _digitSlot(String c, int fromRight, Duration duration) {
+    final glyph = Text(c, key: ValueKey(c), style: style);
+    if (!RegExp(r'\d').hasMatch(c)) {
+      return KeyedSubtree(key: ValueKey(fromRight), child: glyph);
+    }
+    return ClipRect(
+      key: ValueKey(fromRight),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Widest digit fixes the slot width, so the row never jitters.
+          Opacity(opacity: 0, child: Text('0', style: style)),
+          AnimatedSwitcher(
+            duration: duration,
+            switchInCurve: Curves.easeOutCubic,
+            switchOutCurve: Curves.easeInCubic,
+            transitionBuilder: (child, anim) {
+              final incoming = child.key == ValueKey(c);
+              return SlideTransition(
+                position: Tween<Offset>(
+                  begin: Offset(0, incoming ? 1 : -1),
+                  end: Offset.zero,
+                ).animate(anim),
+                child: child,
+              );
+            },
+            child: glyph,
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class _FareHeroCard extends StatelessWidget {
@@ -684,26 +746,12 @@ class _FareHeroCard extends StatelessWidget {
                   FittedBox(
                     fit: BoxFit.scaleDown,
                     alignment: Alignment.centerLeft,
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 220),
-                      transitionBuilder: (child, anim) => FadeTransition(
-                        opacity: anim,
-                        child: SlideTransition(
-                          position: Tween<Offset>(
-                            begin: const Offset(0, 0.12),
-                            end: Offset.zero,
-                          ).animate(anim),
-                          child: child,
-                        ),
-                      ),
-                      child: Text(
-                        '₱ ${meter.totalFare.toStringAsFixed(2)}',
-                        key: ValueKey(meter.totalFare.toStringAsFixed(2)),
-                        style: AppTheme.fareStyle(
-                          brightness: Brightness.dark,
-                          fontSize: compact ? 30 : 40,
-                          color: Colors.white,
-                        ),
+                    child: RollingFare(
+                      text: '₱ ${meter.totalFare.toStringAsFixed(2)}',
+                      style: AppTheme.fareStyle(
+                        brightness: Brightness.dark,
+                        fontSize: compact ? 30 : 40,
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -761,16 +809,16 @@ class _FareDetail extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                color: Colors.white38,
-                letterSpacing: 0.5,
-              ),
+            color: Colors.white38,
+            letterSpacing: 0.5,
+          ),
         ),
         Text(
           value,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                color: Colors.white70,
-                fontWeight: FontWeight.w600,
-              ),
+            color: Colors.white70,
+            fontWeight: FontWeight.w600,
+          ),
         ),
       ],
     );
@@ -833,10 +881,7 @@ class _TripStatusBanner extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall,
-                ),
+                Text(subtitle, style: theme.textTheme.bodySmall),
               ],
             ),
           ),
@@ -904,8 +949,9 @@ class _MetricsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final fuelUsed =
-        meter.kmPerLiter > 0 ? meter.distanceKm / meter.kmPerLiter : 0.0;
+    final fuelUsed = meter.kmPerLiter > 0
+        ? meter.distanceKm / meter.kmPerLiter
+        : 0.0;
     final primary = Theme.of(context).colorScheme.primary;
 
     return LayoutBuilder(
@@ -1030,361 +1076,370 @@ class _SettingsBottomSheet extends StatelessWidget {
         borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
         border: Border.all(color: AppTheme.borderOf(context)),
       ),
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(20, 10, 20, 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Center(
+              child: Container(
+                width: 42,
+                height: 5,
+                margin: const EdgeInsets.only(bottom: 14),
+                decoration: BoxDecoration(
+                  color: muted.withValues(alpha: 0.45),
+                  borderRadius: BorderRadius.circular(99),
+                ),
+              ),
+            ),
+            Row(
               children: [
-                Center(
-                  child: Container(
-                    width: 42,
-                    height: 5,
-                    margin: const EdgeInsets.only(bottom: 14),
-                    decoration: BoxDecoration(
-                      color: muted.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(99),
-                    ),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Settings',
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      Text(
+                        'Grouped trip configuration',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: muted,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                Row(
-                  children: [
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Settings',
-                            style: theme.textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.w800,
-                            ),
-                          ),
-                          Text(
-                            'Grouped trip configuration',
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(color: muted),
-                          ),
-                        ],
-                      ),
-                    ),
-                    IconButton(
-                      tooltip: 'Close settings',
-                      onPressed: () {
-                        HapticFeedback.selectionClick();
-                        Navigator.pop(context);
-                      },
-                      icon: const Icon(CupertinoIcons.xmark_circle_fill),
-                    ),
-                  ],
+                IconButton(
+                  tooltip: 'Close settings',
+                  onPressed: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.pop(context);
+                  },
+                  icon: const Icon(CupertinoIcons.xmark_circle_fill),
                 ),
-                const SizedBox(height: 16),
-                _SettingsGroup(
-                  title: 'Fare matrix',
-                  description: 'Quick-switch presets recalculate fare instantly',
-                  child: Consumer2<FareMatrixProvider, MeterProvider>(
-                    builder: (context, matrix, liveMeter, _) {
+              ],
+            ),
+            const SizedBox(height: 16),
+            _SettingsGroup(
+              title: 'Fare matrix',
+              description: 'Quick-switch presets recalculate fare instantly',
+              child: Consumer2<FareMatrixProvider, MeterProvider>(
+                builder: (context, matrix, liveMeter, _) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      InputDecorator(
+                        decoration: const InputDecoration(
+                          isDense: true,
+                          border: OutlineInputBorder(),
+                          labelText: 'Active preset',
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<FarePresetId>(
+                            isExpanded: true,
+                            value: matrix.presetId,
+                            items: [
+                              for (final preset in FarePreset.presets)
+                                DropdownMenuItem(
+                                  value: preset.id,
+                                  child: Text(preset.name),
+                                ),
+                            ],
+                            onChanged: (id) {
+                              if (id == null) return;
+                              matrix.selectPreset(id);
+                              liveMeter.applyFareMatrix(matrix);
+                              baseFareController.text = liveMeter.baseFare
+                                  .toStringAsFixed(2);
+                            },
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        matrix.activePreset.description,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: muted,
+                        ),
+                      ),
+                      if (!matrix.activePreset.isFuelBased)
+                        Text(
+                          '₱${matrix.activePreset.flagdown.toStringAsFixed(0)} flagdown · '
+                          '₱${matrix.activePreset.ratePerKm.toStringAsFixed(2)}/km · '
+                          '₱${matrix.activePreset.waitingPerMinute.toStringAsFixed(2)}/min',
+                          style: theme.textTheme.labelSmall?.copyWith(
+                            color: muted,
+                          ),
+                        ),
+                      // Store policy: government-sourced info needs its
+                      // source and a non-affiliation notice.
+                      const SizedBox(height: 6),
+                      Text(
+                        'Estimates based on publicly announced LTFRB fare '
+                        'rates. Biyahe Meter is not affiliated with or '
+                        'endorsed by the LTFRB, and is not a substitute '
+                        'for a sealed taximeter.',
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: muted,
+                        ),
+                      ),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: TextButton.icon(
+                          style: TextButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                            minimumSize: const Size(48, 40),
+                          ),
+                          icon: const Icon(
+                            CupertinoIcons.arrow_up_right_square,
+                            size: 16,
+                          ),
+                          label: const Text(
+                            'Check official rates (ltfrb.gov.ph)',
+                          ),
+                          onPressed: () => launchUrl(
+                            Uri.parse('https://ltfrb.gov.ph'),
+                            mode: LaunchMode.externalApplication,
+                          ),
+                        ),
+                      ),
+                      SwitchListTile.adaptive(
+                        contentPadding: EdgeInsets.zero,
+                        secondary: Icon(
+                          CupertinoIcons.person_crop_circle_badge_checkmark,
+                          color: theme.colorScheme.primary,
+                        ),
+                        title: Text(
+                          matrix.discountLabel,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        subtitle: Text(
+                          matrix.discountEnabled
+                              ? '20% discount applied to fare'
+                              : 'No passenger discount',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: muted,
+                          ),
+                        ),
+                        value: matrix.discountEnabled,
+                        onChanged: (v) {
+                          matrix.setDiscountEnabled(v);
+                          liveMeter.applyFareMatrix(matrix);
+                        },
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 14),
+            _SettingsGroup(
+              title: 'Appearance',
+              description: 'Adaptive light and dark theme',
+              child: SwitchListTile.adaptive(
+                contentPadding: EdgeInsets.zero,
+                secondary: Icon(
+                  themeProvider.isDarkMode
+                      ? CupertinoIcons.moon_fill
+                      : CupertinoIcons.sun_max_fill,
+                  color: theme.colorScheme.primary,
+                ),
+                title: Text(
+                  'Dark mode',
+                  style: theme.textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                subtitle: Text(
+                  themeProvider.isDarkMode
+                      ? 'Dark dashboard active'
+                      : 'Light dashboard active',
+                  style: theme.textTheme.bodySmall?.copyWith(color: muted),
+                ),
+                value: themeProvider.isDarkMode,
+                onChanged: (_) => themeProvider.toggleTheme(),
+              ),
+            ),
+            const SizedBox(height: 14),
+            _SettingsGroup(
+              title: 'Fare inputs',
+              description: 'Fuel efficiency, gas price, and base fare',
+              child: Column(
+                children: [
+                  _SettingsTile(
+                    icon: FontAwesomeIcons.gasPump,
+                    label: 'Fuel efficiency',
+                    hint: 'km per liter',
+                    controller: kmController,
+                    focusNode: kmFocus,
+                    isEditing: editingKm,
+                    compact: isNarrow,
+                    onTapEdit: onEditKm,
+                    onSave: onSaveKm,
+                  ),
+                  Divider(height: 1, color: AppTheme.borderOf(context)),
+                  _SettingsTile(
+                    icon: FontAwesomeIcons.pesoSign,
+                    label: 'Gas price',
+                    hint: 'pesos per liter',
+                    controller: gasController,
+                    focusNode: gasFocus,
+                    isEditing: editingGas,
+                    compact: isNarrow,
+                    onTapEdit: onEditGas,
+                    onSave: onSaveGas,
+                  ),
+                  Divider(height: 1, color: AppTheme.borderOf(context)),
+                  _SettingsTile(
+                    icon: FontAwesomeIcons.coins,
+                    label: 'Base fare',
+                    hint: 'starting amount',
+                    controller: baseFareController,
+                    focusNode: baseFareFocus,
+                    isEditing: editingBase,
+                    compact: isNarrow,
+                    onTapEdit: onEditBase,
+                    onSave: onSaveBase,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+            _SettingsGroup(
+              title: 'Safety & insights',
+              description: 'Trip sharing, emergency call, and insights',
+              child: Column(
+                children: [
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      CupertinoIcons.phone_fill,
+                      color: AppTheme.dangerOf(context),
+                    ),
+                    title: const Text('Call 911'),
+                    subtitle: const Text(
+                      'Philippine national emergency hotline',
+                    ),
+                    trailing: const Icon(CupertinoIcons.chevron_right),
+                    onTap: () => launchUrl(Uri(scheme: 'tel', path: '911')),
+                  ),
+                  Divider(height: 1, color: AppTheme.borderOf(context)),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      CupertinoIcons.location_circle_fill,
+                      color: theme.colorScheme.primary,
+                    ),
+                    title: const Text('Share my trip'),
+                    subtitle: const Text(
+                      'Send your location and fare to someone you trust. '
+                      'Not an emergency service.',
+                    ),
+                    trailing: const Icon(CupertinoIcons.share),
+                    onTap: () {
+                      final live = context.read<MeterProvider>();
+                      context.read<SosService>().shareLiveRoute(
+                        position: live.currentPosition,
+                        isRunning: live.isRunning,
+                        totalFare: live.totalFare,
+                        distanceKm: live.distanceKm,
+                        presetName: live.activePreset.name,
+                      );
+                    },
+                  ),
+                  Divider(height: 1, color: AppTheme.borderOf(context)),
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Icon(
+                      CupertinoIcons.chart_bar_alt_fill,
+                      color: theme.colorScheme.primary,
+                    ),
+                    title: const Text('Driver Insights'),
+                    subtitle: const Text(
+                      'Earnings, fuel spend, trip logs, CSV export',
+                    ),
+                    trailing: const Icon(CupertinoIcons.chevron_right),
+                    onTap: () {
+                      Navigator.pop(context);
+                      Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const AnalyticsScreen(),
+                        ),
+                      );
+                    },
+                  ),
+                  Divider(height: 1, color: AppTheme.borderOf(context)),
+                  Consumer2<MeterProvider, MapCacheService>(
+                    builder: (context, liveMeter, cache, _) {
                       return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          InputDecorator(
-                            decoration: const InputDecoration(
-                              isDense: true,
-                              border: OutlineInputBorder(),
-                              labelText: 'Active preset',
+                          SwitchListTile.adaptive(
+                            contentPadding: EdgeInsets.zero,
+                            secondary: Icon(
+                              CupertinoIcons.battery_25,
+                              color: theme.colorScheme.primary,
                             ),
-                            child: DropdownButtonHideUnderline(
-                              child: DropdownButton<FarePresetId>(
-                                isExpanded: true,
-                                value: matrix.presetId,
-                                items: [
-                                  for (final preset in FarePreset.presets)
-                                    DropdownMenuItem(
-                                      value: preset.id,
-                                      child: Text(preset.name),
-                                    ),
-                                ],
-                                onChanged: (id) {
-                                  if (id == null) return;
-                                  matrix.selectPreset(id);
-                                  liveMeter.applyFareMatrix(matrix);
-                                  baseFareController.text =
-                                      liveMeter.baseFare.toStringAsFixed(2);
-                                },
+                            title: const Text('Battery saver GPS'),
+                            subtitle: Text(
+                              liveMeter.batterySaver
+                                  ? 'Throttles updates when stationary'
+                                  : 'Highest GPS update frequency',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: muted,
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            matrix.activePreset.description,
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(color: muted),
-                          ),
-                          if (!matrix.activePreset.isFuelBased)
-                            Text(
-                              '₱${matrix.activePreset.flagdown.toStringAsFixed(0)} flagdown · '
-                              '₱${matrix.activePreset.ratePerKm.toStringAsFixed(2)}/km · '
-                              '₱${matrix.activePreset.waitingPerMinute.toStringAsFixed(2)}/min',
-                              style: theme.textTheme.labelSmall
-                                  ?.copyWith(color: muted),
-                            ),
-                          // Store policy: government-sourced info needs its
-                          // source and a non-affiliation notice.
-                          const SizedBox(height: 6),
-                          Text(
-                            'Estimates based on publicly announced LTFRB fare '
-                            'rates. Biyahe Meter is not affiliated with or '
-                            'endorsed by the LTFRB, and is not a substitute '
-                            'for a sealed taximeter.',
-                            style: theme.textTheme.bodySmall
-                                ?.copyWith(color: muted),
-                          ),
-                          Align(
-                            alignment: Alignment.centerLeft,
-                            child: TextButton.icon(
-                              style: TextButton.styleFrom(
-                                padding: EdgeInsets.zero,
-                                minimumSize: const Size(48, 40),
-                              ),
-                              icon: const Icon(
-                                CupertinoIcons.arrow_up_right_square,
-                                size: 16,
-                              ),
-                              label: const Text('Check official rates (ltfrb.gov.ph)'),
-                              onPressed: () => launchUrl(
-                                Uri.parse('https://ltfrb.gov.ph'),
-                                mode: LaunchMode.externalApplication,
-                              ),
-                            ),
+                            value: liveMeter.batterySaver,
+                            onChanged: liveMeter.setBatterySaver,
                           ),
                           SwitchListTile.adaptive(
                             contentPadding: EdgeInsets.zero,
                             secondary: Icon(
-                              CupertinoIcons.person_crop_circle_badge_checkmark,
+                              CupertinoIcons.map,
                               color: theme.colorScheme.primary,
                             ),
-                            title: Text(
-                              matrix.discountLabel,
-                              style: theme.textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.w600,
+                            title: const Text('Offline map cache'),
+                            subtitle: Text(
+                              cache.ready
+                                  ? (cache.enabled
+                                        ? 'Tiles cached for low-signal routes'
+                                        : 'Using live network tiles only')
+                                  : 'Cache unavailable on this platform',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: muted,
                               ),
                             ),
-                            subtitle: Text(
-                              matrix.discountEnabled
-                                  ? '20% discount applied to fare'
-                                  : 'No passenger discount',
-                              style: theme.textTheme.bodySmall
-                                  ?.copyWith(color: muted),
-                            ),
-                            value: matrix.discountEnabled,
-                            onChanged: (v) {
-                              matrix.setDiscountEnabled(v);
-                              liveMeter.applyFareMatrix(matrix);
-                            },
+                            value: cache.enabled && cache.ready,
+                            onChanged: cache.ready ? cache.setEnabled : null,
                           ),
                         ],
                       );
                     },
                   ),
-                ),
-                const SizedBox(height: 14),
-                _SettingsGroup(
-                  title: 'Appearance',
-                  description: 'Adaptive light and dark theme',
-                  child: SwitchListTile.adaptive(
-                    contentPadding: EdgeInsets.zero,
-                    secondary: Icon(
-                      themeProvider.isDarkMode
-                          ? CupertinoIcons.moon_fill
-                          : CupertinoIcons.sun_max_fill,
-                      color: theme.colorScheme.primary,
-                    ),
-                    title: Text(
-                      'Dark mode',
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    subtitle: Text(
-                      themeProvider.isDarkMode
-                          ? 'Dark dashboard active'
-                          : 'Light dashboard active',
-                      style: theme.textTheme.bodySmall?.copyWith(color: muted),
-                    ),
-                    value: themeProvider.isDarkMode,
-                    onChanged: (_) => themeProvider.toggleTheme(),
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _SettingsGroup(
-                  title: 'Fare inputs',
-                  description: 'Fuel efficiency, gas price, and base fare',
-                  child: Column(
-                    children: [
-                      _SettingsTile(
-                        icon: FontAwesomeIcons.gasPump,
-                        label: 'Fuel efficiency',
-                        hint: 'km per liter',
-                        controller: kmController,
-                        focusNode: kmFocus,
-                        isEditing: editingKm,
-                        compact: isNarrow,
-                        onTapEdit: onEditKm,
-                        onSave: onSaveKm,
-                      ),
-                      Divider(height: 1, color: AppTheme.borderOf(context)),
-                      _SettingsTile(
-                        icon: FontAwesomeIcons.pesoSign,
-                        label: 'Gas price',
-                        hint: 'pesos per liter',
-                        controller: gasController,
-                        focusNode: gasFocus,
-                        isEditing: editingGas,
-                        compact: isNarrow,
-                        onTapEdit: onEditGas,
-                        onSave: onSaveGas,
-                      ),
-                      Divider(height: 1, color: AppTheme.borderOf(context)),
-                      _SettingsTile(
-                        icon: FontAwesomeIcons.coins,
-                        label: 'Base fare',
-                        hint: 'starting amount',
-                        controller: baseFareController,
-                        focusNode: baseFareFocus,
-                        isEditing: editingBase,
-                        compact: isNarrow,
-                        onTapEdit: onEditBase,
-                        onSave: onSaveBase,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                _SettingsGroup(
-                  title: 'Safety & insights',
-                  description: 'Trip sharing, emergency call, and insights',
-                  child: Column(
-                    children: [
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          CupertinoIcons.phone_fill,
-                          color: AppTheme.dangerOf(context),
-                        ),
-                        title: const Text('Call 911'),
-                        subtitle: const Text(
-                          'Philippine national emergency hotline',
-                        ),
-                        trailing: const Icon(CupertinoIcons.chevron_right),
-                        onTap: () => launchUrl(Uri(scheme: 'tel', path: '911')),
-                      ),
-                      Divider(height: 1, color: AppTheme.borderOf(context)),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          CupertinoIcons.location_circle_fill,
-                          color: theme.colorScheme.primary,
-                        ),
-                        title: const Text('Share my trip'),
-                        subtitle: const Text(
-                          'Send your location and fare to someone you trust. '
-                          'Not an emergency service.',
-                        ),
-                        trailing: const Icon(CupertinoIcons.share),
-                        onTap: () {
-                          final live = context.read<MeterProvider>();
-                          context.read<SosService>().shareLiveRoute(
-                                position: live.currentPosition,
-                                isRunning: live.isRunning,
-                                totalFare: live.totalFare,
-                                distanceKm: live.distanceKm,
-                                presetName: live.activePreset.name,
-                              );
-                        },
-                      ),
-                      Divider(height: 1, color: AppTheme.borderOf(context)),
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Icon(
-                          CupertinoIcons.chart_bar_alt_fill,
-                          color: theme.colorScheme.primary,
-                        ),
-                        title: const Text('Driver Insights'),
-                        subtitle: const Text(
-                          'Earnings, fuel spend, trip logs, CSV export',
-                        ),
-                        trailing: const Icon(CupertinoIcons.chevron_right),
-                        onTap: () {
-                          Navigator.pop(context);
-                          Navigator.of(context).push(
-                            MaterialPageRoute<void>(
-                              builder: (_) => const AnalyticsScreen(),
-                            ),
-                          );
-                        },
-                      ),
-                      Divider(height: 1, color: AppTheme.borderOf(context)),
-                      Consumer2<MeterProvider, MapCacheService>(
-                        builder: (context, liveMeter, cache, _) {
-                          return Column(
-                            children: [
-                              SwitchListTile.adaptive(
-                                contentPadding: EdgeInsets.zero,
-                                secondary: Icon(
-                                  CupertinoIcons.battery_25,
-                                  color: theme.colorScheme.primary,
-                                ),
-                                title: const Text('Battery saver GPS'),
-                                subtitle: Text(
-                                  liveMeter.batterySaver
-                                      ? 'Throttles updates when stationary'
-                                      : 'Highest GPS update frequency',
-                                  style: theme.textTheme.bodySmall
-                                      ?.copyWith(color: muted),
-                                ),
-                                value: liveMeter.batterySaver,
-                                onChanged: liveMeter.setBatterySaver,
-                              ),
-                              SwitchListTile.adaptive(
-                                contentPadding: EdgeInsets.zero,
-                                secondary: Icon(
-                                  CupertinoIcons.map,
-                                  color: theme.colorScheme.primary,
-                                ),
-                                title: const Text('Offline map cache'),
-                                subtitle: Text(
-                                  cache.ready
-                                      ? (cache.enabled
-                                          ? 'Tiles cached for low-signal routes'
-                                          : 'Using live network tiles only')
-                                      : 'Cache unavailable on this platform',
-                                  style: theme.textTheme.bodySmall
-                                      ?.copyWith(color: muted),
-                                ),
-                                value: cache.enabled && cache.ready,
-                                onChanged: cache.ready ? cache.setEnabled : null,
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  meter.activePreset.isFuelBased
-                      ? 'Fuel mode · Current fare ₱${meter.totalFare.toStringAsFixed(2)}'
-                      : '${meter.activePreset.name} · '
-                          '₱${meter.activePreset.ratePerKm.toStringAsFixed(2)}/km · '
-                          'Fare ₱${meter.totalFare.toStringAsFixed(2)}'
-                          '${meter.discountEnabled ? ' · 20% off' : ''}',
-                  textAlign: TextAlign.center,
-                  style: theme.textTheme.labelSmall?.copyWith(color: muted),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      }
+            const SizedBox(height: 12),
+            Text(
+              meter.activePreset.isFuelBased
+                  ? 'Fuel mode · Current fare ₱${meter.totalFare.toStringAsFixed(2)}'
+                  : '${meter.activePreset.name} · '
+                        '₱${meter.activePreset.ratePerKm.toStringAsFixed(2)}/km · '
+                        'Fare ₱${meter.totalFare.toStringAsFixed(2)}'
+                        '${meter.discountEnabled ? ' · 20% off' : ''}',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.labelSmall?.copyWith(color: muted),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _SettingsGroup extends StatelessWidget {
@@ -1468,9 +1523,7 @@ class _SettingsTile extends StatelessWidget {
       child: InkWell(
         onTap: isEditing ? null : onTapEdit,
         child: Padding(
-          padding: EdgeInsets.symmetric(
-            vertical: compact ? 10 : 12,
-          ),
+          padding: EdgeInsets.symmetric(vertical: compact ? 10 : 12),
           child: Row(
             children: [
               Container(
@@ -1480,9 +1533,7 @@ class _SettingsTile extends StatelessWidget {
                   color: primary.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(11),
                 ),
-                child: Center(
-                  child: FaIcon(icon, size: 14, color: primary),
-                ),
+                child: Center(child: FaIcon(icon, size: 14, color: primary)),
               ),
               const SizedBox(width: 12),
               Expanded(
