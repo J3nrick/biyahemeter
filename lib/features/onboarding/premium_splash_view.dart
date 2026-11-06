@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -8,21 +7,17 @@ import 'package:biyahe_meter/features/onboarding/agreements_screen.dart';
 
 /// Screen 1: Splash Screen (`SplashScreen`)
 ///
-/// "Light Assembly" — made from nothing but the logo's own pixels:
-/// - 0.00–1.10s  Inflow: the logo is sampled into ~6k points of light that
-///               stream in from the left like headlights, leaving light trails,
-///               and land on their exact pixel (left→right, like the road bar).
-/// - 0.90–1.45s  Ignition: the crisp HD logo takes over with a brief flare.
-/// - 1.35–1.95s  Sheen: a specular band sweeps the letters; tagline fades in.
-/// - 2.00–2.80s  Zoom-through: the logo bursts into light toward the viewer
-///               while the app fades in underneath (handed off at 2.30s).
+/// A short, clean logo reveal (Maya-style), about 1.3 s:
+/// - 0.00–0.45s  Pop: the logo scales up into place with a soft overshoot.
+/// - 0.35–0.65s  The tagline fades in.
+/// - 0.45–0.85s  Sheen: one band of light sweeps the letters.
+/// - 0.95s       Hand-off: the app starts fading in underneath.
+/// - 0.95–1.30s  Exit: the logo grows slightly and fades out.
 /// Tap anywhere to skip.
 ///
-/// PERFORMANCE (see memory-bank/activeContext.md, do not regress):
-/// - ONE [CustomPainter] repainted by the controller; zero widget rebuilds.
-/// - Logo decoded + sampled into particles BEFORE the clock starts.
-/// - Particles = two batched `drawRawPoints` calls per frame (white, cyan).
-/// - No saveLayer / ShaderMask / Opacity / BackdropFilter / blur MaskFilter.
+/// PERFORMANCE: one [CustomPainter] repainted by the controller; per frame it
+/// draws one image (two during the sheen) and one short text. No particles,
+/// no layers, no image sampling, nothing to prepare before the clock starts.
 class SplashScreen extends StatefulWidget {
   final VoidCallback? onFinish;
   final AnimationController? controller; // Optional backward compatibility
@@ -44,43 +39,40 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
   static const _logoAsset = 'assets/images/logo_dark_hd.png';
-  static const _total = Duration(milliseconds: 2800);
 
   late final AnimationController _anim;
 
   ImageStream? _stream;
   ImageStreamListener? _listener;
   ImageInfo? _logoInfo;
-  _Particles? _particles;
   bool _resolved = false;
   bool _started = false;
-  bool _warming = false;
   bool _done = false;
 
   Timer? _startFallback;
   Timer? _safetyTimer;
-  final List<Timer> _haptics = [];
+  Timer? _haptic;
 
-  double get _speed => widget.quick ? 0.55 : 1.0;
+  double get _speed => widget.quick ? 0.65 : 1.0;
 
   @override
   void initState() {
     super.initState();
-
-    _anim = AnimationController(vsync: this, duration: _total * _speed);
-
+    _anim = AnimationController(
+      vsync: this,
+      duration: Duration(
+        milliseconds: (_SplashPainter.totalMs * _speed).round(),
+      ),
+    );
     _anim.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
-        _proceed();
-      }
+      if (status == AnimationStatus.completed) _proceed();
     });
-    // Hand off mid-burst so the app fades in behind the flying light.
+    // Hand off early in the exit so the app fades in behind the logo.
     _anim.addListener(() {
       if (_anim.value >= _SplashPainter.handoffFrame) _proceed();
     });
-
-    // Never block the app: covers slow decode + sampling + shader warm-up.
-    _startFallback = Timer(const Duration(milliseconds: 2200), _begin);
+    // The logo is a 42 KB asset; if decoding is ever slow, don't wait on it.
+    _startFallback = Timer(const Duration(milliseconds: 400), _begin);
   }
 
   @override
@@ -93,99 +85,42 @@ class _SplashScreenState extends State<SplashScreen>
       _logoAsset,
     ).resolve(createLocalImageConfiguration(context));
     _stream = stream;
-    _listener = ImageStreamListener((info, synchronousCall) {
+    _listener = ImageStreamListener((info, _) {
       _logoInfo?.dispose();
       _logoInfo = info.clone();
-      _prepareThenBegin();
+      if (mounted) setState(() {});
+      _begin();
     }, onError: (_, _) => _begin());
     stream.addListener(_listener!);
-  }
-
-  /// Sample particles and warm shaders offscreen BEFORE the clock starts, so
-  /// the first animated frame costs the same as the last. Capped so it can
-  /// never delay the splash noticeably.
-  Future<void> _prepareThenBegin() async {
-    if (_started || _warming) return;
-    _warming = true;
-    try {
-      await (() async {
-        _particles = await _Particles.sample(_logoInfo!.image);
-        if (mounted) setState(() {});
-        await _warmUp();
-      })().timeout(const Duration(milliseconds: 900));
-    } catch (_) {}
-    if (!mounted) return;
-    WidgetsBinding.instance.addPostFrameCallback((_) => _begin());
-  }
-
-  Future<void> _warmUp() async {
-    final img = _logoInfo?.image;
-    if (img == null || !mounted) return;
-    final size = MediaQuery.sizeOf(context);
-    const scale = 0.25;
-    final w = math.max(1, (size.width * scale).ceil());
-    final h = math.max(1, (size.height * scale).ceil());
-    final painter = _SplashPainter(
-      anim: const AlwaysStoppedAnimation<double>(0),
-      image: img,
-      particles: _particles,
-    );
-    // One time-point inside each effect: inflow, ignition, sheen, departure.
-    for (final t in const [0.20, 0.42, 0.58, 0.80]) {
-      final recorder = ui.PictureRecorder();
-      final canvas = Canvas(recorder)..scale(scale);
-      painter.paintAt(canvas, size, t);
-      final picture = recorder.endRecording();
-      final out = await picture.toImage(w, h);
-      out.dispose();
-      picture.dispose();
-    }
   }
 
   void _begin() {
     if (_started || !mounted) return;
     _started = true;
     _startFallback?.cancel();
-    _startFallback = null;
 
-    // Reduced motion: the crisp logo, still, then on to the app.
+    // Reduced motion: the logo, still, then on to the app.
     if (MediaQuery.disableAnimationsOf(context)) {
-      _anim.value = _SplashPainter.composedFrame;
-      _safetyTimer = Timer(const Duration(milliseconds: 900), _proceed);
+      _anim.value = _SplashPainter.restFrame;
+      _safetyTimer = Timer(const Duration(milliseconds: 700), _proceed);
       return;
     }
 
     _anim.forward();
-
-    // Tactile cues: ignition, departure.
     if (!kIsWeb) {
-      void at(int ms, Future<void> Function() fire) {
-        _haptics.add(
-          Timer(Duration(milliseconds: (ms * _speed).round()), () {
-            if (!mounted) return;
-            try {
-              fire();
-            } catch (_) {}
-          }),
-        );
-      }
-
-      at(1150, HapticFeedback.lightImpact);
-      at(2050, HapticFeedback.mediumImpact);
+      // A light tap as the logo lands.
+      _haptic = Timer(Duration(milliseconds: (380 * _speed).round()), () {
+        if (mounted) HapticFeedback.lightImpact().catchError((_) {});
+      });
     }
-
-    // Safety fallback
     _safetyTimer = Timer(
       _anim.duration! + const Duration(milliseconds: 300),
-      () {
-        if (mounted) _proceed();
-      },
+      _proceed,
     );
   }
 
   void _proceed() {
     _safetyTimer?.cancel();
-    _safetyTimer = null;
     if (!mounted || _done) return;
     _done = true;
 
@@ -215,9 +150,7 @@ class _SplashScreenState extends State<SplashScreen>
   void dispose() {
     _startFallback?.cancel();
     _safetyTimer?.cancel();
-    for (final t in _haptics) {
-      t.cancel();
-    }
+    _haptic?.cancel();
     if (_listener != null) _stream?.removeListener(_listener!);
     _logoInfo?.dispose();
     _anim.dispose();
@@ -230,12 +163,12 @@ class _SplashScreenState extends State<SplashScreen>
       value: const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
-        systemNavigationBarColor: Color(0xFF03050B),
+        systemNavigationBarColor: _SplashPainter.navy,
         systemNavigationBarIconBrightness: Brightness.light,
       ),
       child: Scaffold(
         // Same flat navy as the native launch screen, so there's no blink.
-        backgroundColor: _SplashPainter.launchNavy,
+        backgroundColor: _SplashPainter.navy,
         body: Semantics(
           container: true,
           label: 'Biyahe Meter',
@@ -245,38 +178,11 @@ class _SplashScreenState extends State<SplashScreen>
             behavior: HitTestBehavior.opaque,
             onTap: _proceed,
             child: ExcludeSemantics(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Static backdrop (matches web/index.html's loader), rasterised once.
-                  const RepaintBoundary(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: RadialGradient(
-                          center: Alignment(0.0, -0.05),
-                          radius: 1.35,
-                          colors: [
-                            Color(0xFF0C1B3E),
-                            Color(0xFF060D20),
-                            Color(0xFF020409),
-                          ],
-                          stops: [0.0, 0.58, 1.0],
-                        ),
-                      ),
-                    ),
-                  ),
-                  RepaintBoundary(
-                    child: CustomPaint(
-                      painter: _SplashPainter(
-                        anim: _anim,
-                        image: _logoInfo?.image,
-                        particles: _particles,
-                      ),
-                      isComplex: true,
-                      willChange: true,
-                    ),
-                  ),
-                ],
+              child: RepaintBoundary(
+                child: CustomPaint(
+                  painter: _SplashPainter(anim: _anim, image: _logoInfo?.image),
+                  size: Size.infinite,
+                ),
               ),
             ),
           ),
@@ -286,111 +192,35 @@ class _SplashScreenState extends State<SplashScreen>
   }
 }
 
-// ---------------------------------------------------------------------------
-// Logo → particles
-// ---------------------------------------------------------------------------
-
-/// Points sampled from the logo's opaque pixels, in logo-crop units (0..1),
-/// with per-point random seeds. Built once from the decoded image.
-class _Particles {
-  final Float32List x, y, r1, r2, r3;
-  final List<bool> cyan;
-  final double dot; // sampling step as a fraction of the crop width
-
-  _Particles(this.x, this.y, this.r1, this.r2, this.r3, this.cyan, this.dot);
-
-  int get length => cyan.length;
-
-  static const _maxPoints = 6500;
-
-  static Future<_Particles?> sample(ui.Image img) async {
-    final data = await img.toByteData(format: ui.ImageByteFormat.rawRgba);
-    if (data == null) return null;
-    final w = img.width;
-    final crop = _SplashPainter.cropOf(w);
-
-    bool opaque(int px, int py) => data.getUint8((py * w + px) * 4 + 3) > 140;
-
-    // Coarsest step that still keeps the count under budget.
-    var step = 4;
-    while (true) {
-      var n = 0;
-      for (var py = crop.top.toInt(); py < crop.bottom; py += step) {
-        for (var px = crop.left.toInt(); px < crop.right; px += step) {
-          if (opaque(px, py)) n++;
-        }
-      }
-      if (n <= _maxPoints || step >= 12) break;
-      step++;
-    }
-
-    final xs = <double>[], ys = <double>[], cy = <bool>[];
-    for (var py = crop.top.toInt(); py < crop.bottom; py += step) {
-      for (var px = crop.left.toInt(); px < crop.right; px += step) {
-        if (!opaque(px, py)) continue;
-        final i = (py * w + px) * 4;
-        final r = data.getUint8(i), b = data.getUint8(i + 2);
-        xs.add((px - crop.left) / crop.width);
-        ys.add((py - crop.top) / crop.height);
-        cy.add(b > 180 && r < 160); // METER + road are cyan, letters white
-      }
-    }
-    final n = cy.length;
-    final rnd = math.Random(7);
-    Float32List seeds() =>
-        Float32List.fromList(List.generate(n, (_) => rnd.nextDouble()));
-    return _Particles(
-      Float32List.fromList(xs),
-      Float32List.fromList(ys),
-      seeds(),
-      seeds(),
-      seeds(),
-      cy,
-      step / crop.width,
-    );
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Timeline helpers (ms of the 2800 ms clock)
-// ---------------------------------------------------------------------------
-
-const double _totalMs = 2800;
-
 double _seg(double ms, double aMs, double bMs, [Curve curve = Curves.linear]) =>
     curve.transform(((ms - aMs) / (bMs - aMs)).clamp(0.0, 1.0));
-
-// ---------------------------------------------------------------------------
-// Single-pass splash painter
-// ---------------------------------------------------------------------------
 
 class _SplashPainter extends CustomPainter {
   final Animation<double> anim;
   final ui.Image? image;
-  final _Particles? particles;
 
-  _SplashPainter({
-    required this.anim,
-    required this.image,
-    required this.particles,
-  }) : super(repaint: anim);
+  _SplashPainter({required this.anim, required this.image})
+    : super(repaint: anim);
 
-  /// Value where the crisp logo is fully in and still (reduced motion).
-  static const double composedFrame = 1990 / _totalMs;
+  static const double totalMs = 1300;
 
-  /// Value where [SplashScreen.onFinish] fires, mid zoom-through.
-  static const double handoffFrame = 2300 / _totalMs;
+  /// Logo fully in and still (used for reduced motion).
+  static const double restFrame = 900 / totalMs;
 
-  static const launchNavy = Color(0xFF060D20);
+  /// Where [SplashScreen.onFinish] fires, early in the exit.
+  static const double handoffFrame = 950 / totalMs;
+
+  static const navy = Color(0xFF060D20);
   static const _tagline = 'Sakay na.';
-
-  static const _cyan = Color(0xFF38BDF8);
 
   /// Visible logo inside logo_dark_hd.png (1308 × 452), scaled to [imgW].
   static Rect cropOf(int imgW) {
     final s = imgW / 1308;
     return Rect.fromLTRB(18 * s, 18 * s, 1248 * s, 432 * s);
   }
+
+  // Soft overshoot: lands a touch past full size, then settles.
+  static const _pop = Cubic(0.34, 1.36, 0.64, 1);
 
   final Paint _imagePaint = Paint()
     ..filterQuality = FilterQuality.medium
@@ -401,76 +231,58 @@ class _SplashPainter extends CustomPainter {
       Color(0x8CFFFFFF),
       BlendMode.srcATop,
     );
-  final Paint _white = Paint()
-    ..strokeCap = StrokeCap.round
-    ..blendMode = BlendMode.plus; // overlapping trails add up like real light
-  final Paint _blue = Paint()
-    ..strokeCap = StrokeCap.round
-    ..blendMode = BlendMode.plus;
-
-  Float32List? _whiteBuf, _blueBuf;
 
   @override
-  void paint(Canvas canvas, Size size) => paintAt(canvas, size, anim.value);
-
-  void paintAt(Canvas canvas, Size size, double t) {
-    final ms = t * _totalMs;
+  void paint(Canvas canvas, Size size) {
+    final ms = anim.value * totalMs;
     final w = size.width, h = size.height;
-    final logoW = (w * (w >= 600 ? 0.46 : 0.78)).clamp(260.0, 440.0);
+    final logoW = (w * (w >= 600 ? 0.42 : 0.70)).clamp(220.0, 400.0);
     final logoH = logoW * 414 / 1230;
+    final center = Offset(w / 2, h / 2 - h * 0.03);
+
+    final exit = _seg(ms, 950, totalMs, Curves.easeInCubic);
+    final scale = (0.82 + 0.18 * _seg(ms, 0, 450, _pop)) * (1 + 0.12 * exit);
+    final alpha = _seg(ms, 0, 280, Curves.easeOut) * (1 - exit);
+    if (alpha <= 0.01) return;
+
     final logo = Rect.fromCenter(
-      center: Offset(w / 2, h / 2 - h * 0.02),
-      width: logoW,
-      height: logoH,
+      center: center,
+      width: logoW * scale,
+      height: logoH * scale,
     );
 
-    // Veil of launch navy over the gradient backdrop, lifting as light arrives.
-    final veil = 1 - _seg(ms, 0, 500, Curves.easeOut);
-    if (veil > 0.01) {
-      canvas.drawRect(
-        Offset.zero & size,
-        Paint()..color = launchNavy.withValues(alpha: veil),
-      );
+    final tagAlpha = _seg(ms, 350, 650, Curves.easeOut) * (1 - exit);
+    if (tagAlpha > 0.01) {
+      final fontSize = (logoW * 0.062).clamp(14.0, 22.0);
+      final tp = TextPainter(
+        text: TextSpan(
+          text: _tagline,
+          style: TextStyle(
+            color: Colors.white.withValues(alpha: 0.72 * tagAlpha),
+            fontSize: fontSize,
+            fontWeight: FontWeight.w500,
+            letterSpacing: fontSize * 0.18,
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      final y = center.dy + logoH / 2 + logoH * 0.22 + (1 - tagAlpha) * 6;
+      tp.paint(canvas, Offset(center.dx - tp.width / 2, y));
+      tp.dispose();
     }
-
-    final p = particles;
-    final ignite = _seg(ms, 900, 1350, Curves.easeInOut);
-    final breakUp = _seg(ms, 2000, 2280, Curves.easeIn);
-    // Without particles (sampling failed) the crisp logo simply fades in.
-    final imageAlpha = (p == null ? _seg(ms, 0, 500) : ignite) * (1 - breakUp);
-    final particleAlpha =
-        math.max(1 - ignite, breakUp) * (1 - _seg(ms, 2550, _totalMs));
-
-    if (p != null && particleAlpha > 0.01) {
-      _paintParticles(canvas, size, logo, p, ms, particleAlpha);
-    }
-
-    final tagAlpha = _seg(ms, 1450, 1800, Curves.easeOut) * (1 - breakUp);
-    if (tagAlpha > 0.01) _paintTagline(canvas, logo, tagAlpha);
 
     final img = image;
-    if (img == null || imageAlpha <= 0.01) return;
+    if (img == null) return;
     final src = cropOf(img.width);
-    _imagePaint
-      ..blendMode = BlendMode.srcOver
-      ..color = Colors.white.withValues(alpha: imageAlpha);
+    _imagePaint.color = Colors.white.withValues(alpha: alpha);
     canvas.drawImageRect(img, src, logo, _imagePaint);
 
-    // Ignition flare: the logo drawn over itself additively, once.
-    final flare = math.sin(_seg(ms, 1100, 1550) * math.pi) * 0.55;
-    if (flare > 0.01) {
-      _imagePaint
-        ..blendMode = BlendMode.plus
-        ..color = Colors.white.withValues(alpha: flare * imageAlpha);
-      canvas.drawImageRect(img, src, logo, _imagePaint);
-    }
-
     // Sheen: a slanted band of light, clipped, re-drawing only logo pixels.
-    final s = _seg(ms, 1350, 1950, Curves.easeInOutSine);
+    final s = _seg(ms, 450, 850, Curves.easeInOutSine);
     if (s > 0 && s < 1) {
-      final cx = logo.left - logoW * 0.25 + logoW * 1.5 * s;
-      final band = logoW * 0.09;
-      final slant = logoH * 0.6;
+      final cx = logo.left - logo.width * 0.25 + logo.width * 1.5 * s;
+      final band = logo.width * 0.08;
+      final slant = logo.height * 0.6;
       canvas.save();
       canvas.clipPath(
         Path()
@@ -480,125 +292,12 @@ class _SplashPainter extends CustomPainter {
           ..lineTo(cx - band - slant, logo.bottom)
           ..close(),
       );
-      _sheenPaint.color = Colors.white.withValues(alpha: imageAlpha);
+      _sheenPaint.color = Colors.white.withValues(alpha: alpha);
       canvas.drawImageRect(img, src, logo, _sheenPaint);
       canvas.restore();
     }
   }
 
-  /// Laid out per frame while visible (~0.5 s): a 9-char string is cheap, and
-  /// colour alpha avoids a saveLayer.
-  void _paintTagline(Canvas canvas, Rect logo, double alpha) {
-    final fontSize = (logo.width * 0.062).clamp(15.0, 24.0);
-    final tp = TextPainter(
-      text: TextSpan(
-        text: _tagline,
-        style: TextStyle(
-          color: Colors.white.withValues(alpha: 0.72 * alpha),
-          fontSize: fontSize,
-          fontWeight: FontWeight.w500,
-          letterSpacing: fontSize * 0.18,
-        ),
-      ),
-      textDirection: TextDirection.ltr,
-    )..layout();
-    final y = logo.bottom + logo.height * 0.22 + (1 - alpha) * 6;
-    tp.paint(canvas, Offset(logo.center.dx - tp.width / 2, y));
-    tp.dispose();
-  }
-
-  /// Each particle is a short line from where it was a moment ago to where it
-  /// is now, so fast ones become light trails and settled ones become dots.
-  void _paintParticles(
-    Canvas canvas,
-    Size size,
-    Rect logo,
-    _Particles p,
-    double ms,
-    double alpha,
-  ) {
-    final n = p.length;
-    final wb = _whiteBuf ??= Float32List(n * 4);
-    final bb = _blueBuf ??= Float32List(n * 4);
-    var wi = 0, bi = 0;
-    final w = size.width, h = size.height;
-
-    for (var i = 0; i < n; i++) {
-      final tx = logo.left + p.x[i] * logo.width;
-      final ty = logo.top + p.y[i] * logo.height;
-      double hx, hy, ox, oy;
-
-      if (ms < 2000) {
-        // Inflow: lanes from off-screen left; left side of the logo lands first.
-        final u = (ms / 1100 - (0.42 * p.x[i] + 0.30 * p.r1[i])) / 0.5;
-        if (u <= 0) continue;
-        final sx = -(0.08 + 0.9 * p.r2[i]) * w;
-        final sy = ty + (p.r3[i] - 0.5) * h * 0.16;
-        final a = u > 1 ? 1.0 : u,
-            b = u - 0.07 < 0 ? 0.0 : (u - 0.07 > 1 ? 1.0 : u - 0.07);
-        final ia = 1 - a, ib = 1 - b;
-        // x: easeOutQuart, y: easeOutCubic (lanes merge a touch later).
-        hx = sx + (tx - sx) * (1 - ia * ia * ia * ia);
-        hy = sy + (ty - sy) * (1 - ia * ia * ia);
-        ox = sx + (tx - sx) * (1 - ib * ib * ib * ib);
-        oy = sy + (ty - sy) * (1 - ib * ib * ib);
-      } else {
-        // Zoom-through: every point flies outward from the logo's centre, as
-        // if the camera dives through it; outer points stream past first.
-        final v = ((ms - 2000) / 800 - 0.18 * p.r1[i]) / 0.7;
-        final a = v < 0 ? 0.0 : (v > 1 ? 1.0 : v);
-        final b = v - 0.06 < 0 ? 0.0 : (v - 0.06 > 1 ? 1.0 : v - 0.06);
-        final k = 5 + 9 * p.r2[i];
-        final dx = tx - logo.center.dx, dy = ty - logo.center.dy;
-        final ea = a * a * a * k, eb = b * b * b * k; // easeInCubic
-        hx = tx + dx * ea;
-        hy = ty + dy * ea + (p.r3[i] - 0.5) * h * 0.04 * ea;
-        ox = tx + dx * eb;
-        oy = ty + dy * eb + (p.r3[i] - 0.5) * h * 0.04 * eb;
-      }
-
-      if (p.cyan[i]) {
-        bb[bi++] = ox;
-        bb[bi++] = oy;
-        bb[bi++] = hx;
-        bb[bi++] = hy;
-      } else {
-        wb[wi++] = ox;
-        wb[wi++] = oy;
-        wb[wi++] = hx;
-        wb[wi++] = hy;
-      }
-    }
-
-    // Moving light is thin and dim (additive trails would saturate to a
-    // solid wedge); it thickens and brightens as points land.
-    final landed = ms < 2000 ? _seg(ms, 600, 1000) : 0.0;
-    final dot = math.max(1.2, p.dot * logo.width * 1.15);
-    final width = dot * (0.42 + 0.58 * landed);
-    final glow = alpha * (0.22 + 0.70 * landed);
-    _white
-      ..strokeWidth = width
-      ..color = Colors.white.withValues(alpha: glow);
-    _blue
-      ..strokeWidth = width
-      ..color = _cyan.withValues(alpha: math.min(1.0, glow * 1.15));
-    if (wi > 0) {
-      canvas.drawRawPoints(
-        ui.PointMode.lines,
-        Float32List.sublistView(wb, 0, wi),
-        _white,
-      );
-    }
-    if (bi > 0) {
-      canvas.drawRawPoints(
-        ui.PointMode.lines,
-        Float32List.sublistView(bb, 0, bi),
-        _blue,
-      );
-    }
-  }
-
   @override
-  bool shouldRepaint(covariant _SplashPainter old) =>
-      old.image != image || old.particles != particles;
+  bool shouldRepaint(covariant _SplashPainter old) => old.image != image;
 }

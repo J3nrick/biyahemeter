@@ -24,22 +24,23 @@ void main() {
         ),
       ),
     );
-    // Real codec decode + particle sampling, then the clock starts.
+    // Real codec decode, then the clock starts.
     await tester.runAsync(
-      () => Future<void>.delayed(const Duration(seconds: 2)),
+      () => Future<void>.delayed(const Duration(milliseconds: 500)),
     );
     await tester.pump();
-    await tester.pump(const Duration(milliseconds: 2200));
 
     var elapsed = 0;
     // Dense 30 fps sequence when dumping (for a preview video), sparse otherwise.
     final stamps = out == null
-        ? const [150, 550, 950, 1400, 1990, 2350, 2790]
-        : [for (var i = 1; i * 33 < 2800; i++) i * 33];
+        ? const [150, 450, 650, 900, 1100, 1290]
+        : [for (var i = 1; i * 33 < 1300; i++) i * 33];
     for (final ms in stamps) {
       await tester.pump(Duration(milliseconds: ms - elapsed));
       elapsed = ms;
       expect(tester.takeException(), isNull);
+      // Fast: the app is already on its way in by ~1 s.
+      if (ms >= 1000) expect(finished, isTrue);
       if (out == null) continue;
       await tester.runAsync(() async {
         final boundary =
